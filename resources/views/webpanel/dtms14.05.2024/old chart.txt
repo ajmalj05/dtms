@@ -1,0 +1,59 @@
+
+ const labels = response.test_result_date;
+        // console.log(response);
+
+    const data = {
+        labels: labels,
+        datasets: [
+        //     {
+        //     type: 'line',
+        //   //  label: 'Result',
+        //     data: response.test_result_value,
+        //     borderColor: "#FF0032",
+        //     backgroundColor: "#FF0032",
+
+        //  },
+            {
+            type: 'bar',
+           // label: '',
+            backgroundColor: response.is_outside_lab,
+            borderColor: response.is_outside_lab,
+            data: response.test_result_value,
+            barThickness: 30,
+
+
+          }
+
+        ]
+    };
+
+    const config = {
+      data: data,
+        options: {
+            maintainAspectRatio: false,
+            plugins: {
+            legend: {
+                display: false,
+            },
+
+        },
+            responsive: false,
+
+
+
+        },
+    };
+
+
+//         };
+
+        // JS - Destroy exiting Chart Instance to reuse <canvas> element
+        let chartStatus = Chart.getChart("myChart"); // <canvas> id
+        if (chartStatus != undefined) {
+            chartStatus.destroy();
+        }
+
+         myChart = new Chart(
+           document.getElementById('myChart'),
+         config
+       );
