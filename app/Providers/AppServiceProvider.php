@@ -6,6 +6,7 @@ use Illuminate\Support\ServiceProvider;
 use DB;
 use Log;
 use File;
+use Illuminate\Support\Facades\URL;
 
 
 class AppServiceProvider extends ServiceProvider
@@ -34,5 +35,8 @@ class AppServiceProvider extends ServiceProvider
         //         '[' . date('Y-m-d H:i:s') . ']' . PHP_EOL . $query->sql . ' [' . implode(', ', $query->bindings) . ']' . PHP_EOL . PHP_EOL
         //     );
         // });
+        if($this->app->environment('production')) {
+            URL::forceScheme('https');
+        }
     }
 }
