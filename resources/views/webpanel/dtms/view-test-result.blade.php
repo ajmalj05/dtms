@@ -12,6 +12,76 @@
       }
 
 </style>
+<style>
+/* AI Pattern Analysis Button - Matches Chatbot Design */
+.btn-ai-pattern-analysis {
+    width: auto;
+    height: 54px;
+    padding: 0 24px;
+    border-radius: 27px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: all 0.3s ease;
+    position: relative;
+    z-index: 2;
+    font-family: 'Poppins', sans-serif;
+    text-decoration: none !important;
+}
+
+.btn-ai-pattern-analysis::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(45deg, #00f2fe, #4facfe, #f093fb, #acb6e5, #74ebd5, #00f2fe);
+    background-size: 300%;
+    z-index: -2;
+    border-radius: 30px;
+    filter: blur(5px);
+    opacity: 0.8;
+    animation: anime-shadow 3s linear infinite;
+}
+
+.btn-ai-pattern-analysis::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #ffffff;
+    z-index: -1;
+    border-radius: 27px;
+}
+
+.btn-ai-pattern-analysis:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 25px rgba(0, 0, 0, 0.2);
+}
+
+.btn-ai-pattern-analysis span {
+    font-weight: 600;
+    font-size: 16px;
+    letter-spacing: -0.2px;
+    background: linear-gradient(92deg, #00f2fe 0%, #4facfe 50%, #f093fb 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+@keyframes anime-shadow {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 100% 50%; }
+}
+</style>
 <form name="frm" action="" method="POST">
     @csrf
 <div class="content-body" >
@@ -106,8 +176,9 @@
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h4 class="card-title">Test Result History</h4>
-                        <button type="button" class="btn btn-info btn-sm" onclick="analyzeTestPatterns()" id="btnAnalyzePatterns">
-                            <i class="fa fa-magic"></i> Analyze Patterns (AI)
+                        <button type="button" class="btn-ai-pattern-analysis" onclick="analyzeTestPatterns()" id="btnAnalyzePatterns">
+                            <i class="fa fa-magic" style="color: #4facfe; font-size: 18px;"></i>
+                            <span>Analyze Patterns (AI)</span>
                         </button>
                     </div>
                     <div class="card-body">
