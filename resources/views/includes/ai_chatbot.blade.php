@@ -18,10 +18,10 @@
     height: 54px; /* Slightly reduced from 56 for tighter look */
     padding: 0 24px;
     border-radius: 27px;
-    background: #ffffff;
+    background: transparent; /* Changed from white to allow stacking */
     border: none;
     cursor: pointer;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0,0,0,0.02); /* Softer, diffused shadow */
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.15); /* Distinct outer shadow */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -52,12 +52,51 @@
 
 .ai-chat-toggle:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 0 25px rgba(0, 0, 0, 0.2);
 }
 
 .ai-chat-toggle svg {
     /* SVG size handled inline */
     flex-shrink: 0;
+}
+
+/* Moving Vibrant Shadow Effect */
+.ai-chat-toggle::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(45deg, #00f2fe, #4facfe, #f093fb, #acb6e5, #74ebd5, #00f2fe);
+    background-size: 300%;
+    z-index: -2;
+    border-radius: 30px;
+    filter: blur(5px);
+    opacity: 0.8;
+    animation: anime-shadow 3s linear infinite;
+}
+
+/* White background body */
+.ai-chat-toggle::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #ffffff;
+    z-index: -1;
+    border-radius: 27px;
+}
+
+@keyframes anime-shadow {
+    0% {
+        background-position: 0% 50%;
+    }
+    100% {
+        background-position: 100% 50%;
+    }
 }
 
 .ai-chat-toggle .chat-badge {

@@ -236,12 +236,12 @@
                         <div class="p-2 text-center">
 
 
-                        <<button type="button" 
+                        {{-- <<button type="button" 
         class="btn btn-sm" 
         style="background-color:rgb(132, 93, 202); color: white; padding: 8px 16px; border-radius: 8px; font-size: 14px; font-weight: bold; margin-top: 5px; border: none; box-shadow: 2px 2px 5px rgba(0,0,0,0.2); cursor: pointer;" 
         data-toggle="modal" data-target="#latest-medicine-modal">
     Open Prescription Window
-</button>
+</button> --}}
 
 
 
@@ -273,7 +273,7 @@
                             <button type="button" title="Save DTMS" class="btn btn-sm btn-primary mt-1 saveAllDtmsDatabtn" onclick="saveAllDtmsData(1)">Save</button>
                         </div>
                         
-                        <div class="p-2 text-center">
+                        <div class="p-2 text-center ml-auto">
                             <!-- Premium AI Analysis Button (Matches Chatbot Design) -->
                              <button type="button" class="btn-ai-analysis mt-1" onclick="openPatientAnalysis()">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="mr-2" style="display:inline-block; vertical-align:middle;">
@@ -290,7 +290,7 @@
                              </button>
                              <style>
                                 .btn-ai-analysis {
-                                    background: white;
+                                    background: transparent;
                                     border: none;
                                     padding: 8px 20px;
                                     border-radius: 25px;
@@ -300,6 +300,38 @@
                                     align-items: center;
                                     transition: transform 0.2s, box-shadow 0.2s;
                                     font-family: 'Poppins', sans-serif;
+                                    position: relative;
+                                    z-index: 1;
+                                }
+                                .btn-ai-analysis::before {
+                                    content: '';
+                                    position: absolute;
+                                    top: -2px;
+                                    left: -2px;
+                                    right: -2px;
+                                    bottom: -2px;
+                                    background: linear-gradient(45deg, #00f2fe, #4facfe, #f093fb, #acb6e5, #74ebd5, #00f2fe);
+                                    background-size: 300%;
+                                    z-index: -2;
+                                    border-radius: 28px;
+                                    filter: blur(4px);
+                                    opacity: 0.8;
+                                    animation: anime-shadow 3s linear infinite;
+                                }
+                                .btn-ai-analysis::after {
+                                    content: '';
+                                    position: absolute;
+                                    top: 0;
+                                    left: 0;
+                                    right: 0;
+                                    bottom: 0;
+                                    background: #ffffff;
+                                    z-index: -1;
+                                    border-radius: 25px;
+                                }
+                                @keyframes anime-shadow {
+                                    0% { background-position: 0% 50%; }
+                                    100% { background-position: 100% 50%; }
                                 }
                                 .btn-ai-analysis:hover {
                                     transform: translateY(-2px);

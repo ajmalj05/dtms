@@ -613,8 +613,8 @@ class AiChatController extends Controller
                 if ($rx->frequency) {
                     $prompt .= " - " . $rx->frequency;
                 }
-                if ($rx->dosage) {
-                    $prompt .= " - Dosage: " . $rx->dosage;
+                if ($rx->dose) {
+                    $prompt .= " - Dosage: " . $rx->dose;
                 }
                 if ($rx->duration) { 
                      $prompt .= " - Duration: " . $rx->duration;
