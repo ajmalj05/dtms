@@ -19,7 +19,7 @@
     <link href="https://cdn.lineicons.com/2.0/LineIcons.css" rel="stylesheet">
      <link href="{{asset('/vendor/datatables/css/jquery.dataTables.min.css')}}" rel="stylesheet">
      <link href="{{asset('/vendor/sweetalert2/dist/sweetalert2.min.css')}}" rel="stylesheet">
-     <ink rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.css">
+     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.css">
 
 
 
