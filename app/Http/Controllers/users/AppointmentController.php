@@ -97,14 +97,14 @@ class AppointmentController extends Controller
 
                 // LOG  // add parameters based on your need
                 $log = array(
-                    'primarykeyvalue_Id' => Session::get('dtms_pid'),
+                    'primarykeyvalue_Id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                     'user_id' => Auth::id(), // userId
                     'log_type' => 1, // save
                     'table_name' => 'PatientAppointment', // Save Patient Appointment
                     'qury_log' => $sql,
                     'description' => 'DTMS ,Save Patient Patient Appointment',
                     'created_date' => date('Y-m-d H:i:s'),
-                    'patient_id' => Session::get('dtms_pid'),
+                    'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 );
 
                 $save_history = $this->HistoryController->saveHistory($log);
@@ -125,14 +125,14 @@ class AppointmentController extends Controller
 
                 // LOG  // add parameters based on your need
                 $log = array(
-                    'primarykeyvalue_Id' => Session::get('dtms_pid'),
+                    'primarykeyvalue_Id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                     'user_id' => Auth::id(), // userId
                     'log_type' => 2, // save
                     'table_name' => 'PatientAppointment', // Save Patient Appointment
                     'qury_log' => $sql,
                     'description' => 'DTMS ,Update Patient Appointment',
                     'created_date' => date('Y-m-d H:i:s'),
-                    'patient_id' => Session::get('dtms_pid'),
+                    'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 );
 
                 $save_history = $this->HistoryController->saveHistory($log);

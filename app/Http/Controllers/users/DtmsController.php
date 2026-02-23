@@ -152,13 +152,13 @@ class DtmsController extends Controller
             //Medical History Data
             $medical_history = PatientMedicalHistory::select('patient_medicalhistory.*', 'users.name')
                 ->leftjoin('users', 'users.id', '=', 'patient_medicalhistory.updated_by')
-                ->where('patient_medicalhistory.patient_id', Session::get('dtms_pid'))
+                ->where('patient_medicalhistory.patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))
                 ->orderBy('patient_medicalhistory.id', 'DESC')
                 ->first();
 
 
-            $diet_history = PatientDietPlan::select('*')->where('patient_id', Session::get('dtms_pid'))->orderBy('answer_sheet_id', 'DESC')->get()->toArray();
-            $pep_history = PatientPep::select('*')->where('patient_id', Session::get('dtms_pid'))->orderBy('answer_sheet_id', 'DESC')->get()->toArray();
+            $diet_history = PatientDietPlan::select('*')->where('patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))->orderBy('answer_sheet_id', 'DESC')->get()->toArray();
+            $pep_history = PatientPep::select('*')->where('patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))->orderBy('answer_sheet_id', 'DESC')->get()->toArray();
 
 
             $pep_questions_data = DietQuestionMaster::with('sub_question')->orderBy('order_no')->where('display_status', 1)->where('type', 2)->where('is_deleted', 0)->get();
@@ -226,7 +226,7 @@ class DtmsController extends Controller
 
             // $patientVisitList = PatientVisits::select('patient_visits.visit_type_id', 'patient_visits.id','patient_visits.visit_code', 'patient_visits.visit_date', 'visit_type_master.visit_type_name')
             // ->join('visit_type_master','visit_type_master.id','=','patient_visits.visit_type_id')
-            // ->where('patient_id',Session::get('dtms_pid'))
+            // ->where('patient_id',(request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))
             // ->orderByDesc('patient_visits.id')
             // ->get();
 
@@ -241,7 +241,7 @@ class DtmsController extends Controller
 
             //WHAT IS THE NEED OF THIS
             // $PatientLabNo="";
-            // $condition=array('PatientId'=>Session::get('dtms_pid'));
+            // $condition=array('PatientId'=>(request()->input('dtms_patient_id') ?? Session::get('dtms_pid')));
             // $getLabNoData= getASingleValueByorderLimit('patient_billing',$condition,'id');
             // if($getLabNoData){
             //     $PatientLabNo=$getLabNoData->PatientLabNo;
@@ -290,7 +290,7 @@ class DtmsController extends Controller
 
         Session::put('dtms_visitid', '');
 
-        // if(Session::get('dtms_visitid') !=""){
+        // if((request()->input('dtms_visitid') ?? Session::get('dtms_visitid')) !=""){
         //     $isenabled=true;
         // }
 
@@ -369,12 +369,12 @@ class DtmsController extends Controller
         //Medical History Data
         $medical_history = PatientMedicalHistory::select('patient_medicalhistory.*', 'users.name')
             ->leftjoin('users', 'users.id', '=', 'patient_medicalhistory.updated_by')
-            ->where('patient_medicalhistory.patient_id', Session::get('dtms_pid'))
+            ->where('patient_medicalhistory.patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))
             ->orderBy('patient_medicalhistory.id', 'DESC')
             ->first();
 
-        $diet_history = PatientDietPlan::select('*')->where('patient_id', Session::get('dtms_pid'))->orderBy('answer_sheet_id', 'DESC')->get()->toArray();
-        $pep_history = PatientPep::select('*')->where('patient_id', Session::get('dtms_pid'))->orderBy('answer_sheet_id', 'DESC')->get()->toArray();
+        $diet_history = PatientDietPlan::select('*')->where('patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))->orderBy('answer_sheet_id', 'DESC')->get()->toArray();
+        $pep_history = PatientPep::select('*')->where('patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))->orderBy('answer_sheet_id', 'DESC')->get()->toArray();
 
 
         $pep_questions_data = DietQuestionMaster::with('sub_question')->orderBy('order_no')->where('display_status', 1)->where('type', 2)->where('is_deleted', 0)->get();
@@ -538,7 +538,7 @@ public function getsubdocument_categoryList(Request $request)
                         'created_by' => Auth::id(),
                         'branch_id' => Session::get('current_branch'),
                         'is_deleted' => 0,
-                        'patient_id' => Session::get('dtms_pid'),
+                        'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                         'created_at' => date('Y-m-d h:i:s'),
                         'updated_at' => date('Y-m-d h:i:s')
                     );
@@ -562,7 +562,7 @@ public function getsubdocument_categoryList(Request $request)
                         'qury_log' => $sql,
                         'description' => 'DTMS ,Save Patient Document',
                         'created_date' => date('Y-m-d H:i:s'),
-                        'patient_id' => Session::get('dtms_pid'),
+                        'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                     );
 
                     $save_history = $this->HistoryController->saveHistory($log);
@@ -591,7 +591,7 @@ public function getsubdocument_categoryList(Request $request)
                 'created_by' => Auth::id(),
                 'branch_id' => Session::get('current_branch'),
                 'is_deleted' => 0,
-                'patient_id' => Session::get('dtms_pid'),
+                'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 'created_at' => date('Y-m-d h:i:s'),
                 'updated_at' => date('Y-m-d h:i:s')
             );
@@ -637,7 +637,7 @@ public function getsubdocument_categoryList(Request $request)
                         //                'is_main' =>1,
                         'upload_type' => 1,
                         'is_deleted' => 0,
-                        'patient_id' => Session::get('dtms_pid'),
+                        'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                         'created_at' => date('Y-m-d h:i:s'),
                         'updated_at' => date('Y-m-d h:i:s')
                     );
@@ -661,7 +661,7 @@ public function getsubdocument_categoryList(Request $request)
                         'qury_log' => $sql,
                         'description' => 'DTMS ,Save Patient Gallery',
                         'created_date' => date('Y-m-d H:i:s'),
-                        'patient_id' => Session::get('dtms_pid'),
+                        'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                     );
 
                     $save_history = $this->HistoryController->saveHistory($log);
@@ -686,7 +686,7 @@ public function getsubdocument_categoryList(Request $request)
                 //                'is_main' =>1,
                 'upload_type' => 2,
                 'is_deleted' => 0,
-                'patient_id' => Session::get('dtms_pid'),
+                'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 'created_at' => date('Y-m-d h:i:s'),
                 'updated_at' => date('Y-m-d h:i:s')
             );
@@ -713,7 +713,7 @@ public function getsubdocument_categoryList(Request $request)
                 'qury_log' => $sql,
                 'description' => 'DTMS ,Save Patient Gallery',
                 'created_date' => date('Y-m-d H:i:s'),
-                'patient_id' => Session::get('dtms_pid'),
+                'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
             );
 
             $save_history = $this->HistoryController->saveHistory($log);
@@ -734,7 +734,7 @@ public function getsubdocument_categoryList(Request $request)
     {
 
         $cond = array();
-        array_push($cond, ['patient_gallery.patient_id', Session::get('dtms_pid')]);
+        array_push($cond, ['patient_gallery.patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid'))]);
         array_push($cond, ['patient_gallery.is_deleted', 0]);
         $filldata = PatientGallery::select('id', 'image', 'patient_id', 'created_at', 'upload_type')
             ->where($cond)
@@ -769,14 +769,14 @@ public function getsubdocument_categoryList(Request $request)
 
             // LOG  // add parameters based on your need
             $log = array(
-                'primarykeyvalue_Id' => Session::get('dtms_pid'),
+                'primarykeyvalue_Id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 'user_id' => Auth::id(), // userId
                 'log_type' => 3, // Delete
                 'table_name' => 'PatientGallery', // Delete Patient Gallery
                 'qury_log' => $sql,
                 'description' => 'DTMS ,Delete Patient Gallery',
                 'created_date' => date('Y-m-d H:i:s'),
-                'patient_id' => Session::get('dtms_pid'),
+                'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
             );
 
             $save_history = $this->HistoryController->saveHistory($log);
@@ -817,7 +817,7 @@ public function getsubdocument_categoryList(Request $request)
                 'created_by' => Auth::id(),
                 'updated_by' => null,
                 'branch_id' => Session::get('current_branch'),
-                'patient_id' => Session::get('dtms_pid'),
+                'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 'is_question_mark' => $is_question_mark,
                 'is_deleted' => 0,
                 'newly_diagnosed'=> $newly_diagnosed
@@ -917,14 +917,14 @@ public function getsubdocument_categoryList(Request $request)
 
                 // LOG  // add parameters based on your need
                 $log = array(
-                    'primarykeyvalue_Id' => Session::get('dtms_pid'),
+                    'primarykeyvalue_Id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                     'user_id' => Auth::id(), // userId
                     'log_type' => 2, // update
                     'table_name' => 'PatientDiagnosis', // update Patient diagnosis
                     'qury_log' => $sql,
                     'description' => 'DTMS ,update Patient Diagnosis',
                     'created_date' => date('Y-m-d H:i:s'),
-                    'patient_id' => Session::get('dtms_pid'),
+                    'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 );
 
                 $save_history = $this->HistoryController->saveHistory($log);
@@ -970,7 +970,7 @@ public function getsubdocument_categoryList(Request $request)
                 'updated_by' => null,
                 'branch_id' => Session::get('current_branch'),
                 'is_deleted' => 0,
-                'patient_id' => Session::get('dtms_pid'),
+                'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
 
                 // 'created_at' => Carbon::now(),
                 // 'updated_at' => null,
@@ -1087,7 +1087,7 @@ public function getsubdocument_categoryList(Request $request)
     public function getComplicationData()
     {
         $cond = array();
-        array_push($cond, ['patient_complication.patient_id', Session::get('dtms_pid')]);
+        array_push($cond, ['patient_complication.patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid'))]);
         array_push($cond, ['patient_complication.is_deleted', 0]);
         $patientComplication = PatientComplication::select('patient_complication.*', 'complication_master.complication_name')
             ->join('complication_master', 'complication_master.id', '=', 'patient_complication.complication_id')
@@ -1136,7 +1136,7 @@ public function getsubdocument_categoryList(Request $request)
     public function getCGM(Request $request)
     {
         $cond = [
-            ['patient_documents.patient_id', Session::get('dtms_pid')],
+            ['patient_documents.patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid'))],
             ['patient_documents.is_deleted', 0],
             ['patient_documents.category_id', 2], // Assuming 2 is the category ID for CGM documents
         ];
@@ -1160,7 +1160,7 @@ public function getsubdocument_categoryList(Request $request)
     {
 
         $cond = array();
-        array_push($cond, ['patient_documents.patient_id', Session::get('dtms_pid')]);
+        array_push($cond, ['patient_documents.patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid'))]);
         array_push($cond, ['patient_documents.is_deleted', 0]);
         $filldata = PatientDocument::select('patient_documents.*', 'document_category.category_name')
             ->leftjoin('document_category', 'document_category.id', '=', 'patient_documents.category_id')
@@ -1194,7 +1194,7 @@ public function getsubdocument_categoryList(Request $request)
     public function getDiagnosisData()
     {
         $cond = array();
-        array_push($cond, ['patient_diagnosis.patient_id', Session::get('dtms_pid')]);
+        array_push($cond, ['patient_diagnosis.patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid'))]);
         array_push($cond, ['patient_diagnosis.is_deleted', 0]);
         $patientDiagnosis = PatientDiagnosis::select('patient_diagnosis.*', 'diagnosis_master.diagnosis_name')
             ->join('diagnosis_master', 'diagnosis_master.id', '=', 'patient_diagnosis.diagnosis_id')
@@ -1283,11 +1283,11 @@ else
 
         $data = array();
         $data['PageName'] = "Medical History ";
-        $data['sessions'] = array('pid' => Session::get('dtms_pid'));
-        $patient_data = PatientRegistration::select('name', 'id', 'gender', 'dob', 'age', 'mobile_number')->where('id', Session::get('dtms_pid'))->orderBy('id', 'DESC')->first();
+        $data['sessions'] = array('pid' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')));
+        $patient_data = PatientRegistration::select('name', 'id', 'gender', 'dob', 'age', 'mobile_number')->where('id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))->orderBy('id', 'DESC')->first();
         $uhidNos = Session::get('current_branch_code') . ' -' . $patient_data->id;
-        $medical_history = PatientMedicalHistory::select('*')->where('patient_id', Session::get('dtms_pid'))->orderBy('id', 'DESC')->first();
-        $diet_history = PatientDietPlan::select('*')->where('patient_id', Session::get('dtms_pid'))->get()->toArray();
+        $medical_history = PatientMedicalHistory::select('*')->where('patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))->orderBy('id', 'DESC')->first();
+        $diet_history = PatientDietPlan::select('*')->where('patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))->get()->toArray();
         $question_data = DietQuestionMaster::select('question', 'order_no', 'id')->where('is_deleted', 0)->get();
         $data['patient_data'] = $patient_data;
         $data['uhidNo'] = $uhidNos;
@@ -1302,10 +1302,10 @@ else
         $data = array();
         $data['PageName'] = "Medications ";
         $data['sessions'] = array(
-            'pid' => Session::get('dtms_pid'),
-            'dtms_visitid' => Session::get('dtms_visitid')
+            'pid' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
+            'dtms_visitid' => (request()->input('dtms_visitid') ?? Session::get('dtms_visitid'))
         );
-        $patient_data = PatientRegistration::select('name', 'id', 'gender', 'dob', 'age', 'mobile_number')->where('id', Session::get('dtms_pid'))->orderBy('id', 'DESC')->first();
+        $patient_data = PatientRegistration::select('name', 'id', 'gender', 'dob', 'age', 'mobile_number')->where('id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))->orderBy('id', 'DESC')->first();
         $uhidNos = Session::get('current_branch_code') . ' -' . $patient_data->id;
         $data['patient_data'] = $patient_data;
         $data['uhidNo'] = $uhidNos;
@@ -1318,8 +1318,8 @@ else
     {
         $data = array();
         $data['PageName'] = "Patient education module (PEP)";
-        $data['sessions'] = array('pid' => Session::get('dtms_pid'));
-        $patient_data = PatientRegistration::select('name', 'id', 'gender', 'dob', 'age', 'mobile_number')->where('id', Session::get('dtms_pid'))->orderBy('id', 'DESC')->first();
+        $data['sessions'] = array('pid' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')));
+        $patient_data = PatientRegistration::select('name', 'id', 'gender', 'dob', 'age', 'mobile_number')->where('id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))->orderBy('id', 'DESC')->first();
         $uhidNos = Session::get('current_branch_code') . ' -' . $patient_data->id;
         $data['patient_data'] = $patient_data;
         $data['uhidNo'] = $uhidNos;
@@ -1330,8 +1330,8 @@ else
     {
         $data = array();
         $data['PageName'] = "Prescription";
-        $data['sessions'] = array('pid' => Session::get('dtms_pid'));
-        $patient_data = PatientRegistration::select('name', 'id', 'gender', 'dob', 'age', 'mobile_number')->where('id', Session::get('dtms_pid'))->orderBy('id', 'DESC')->first();
+        $data['sessions'] = array('pid' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')));
+        $patient_data = PatientRegistration::select('name', 'id', 'gender', 'dob', 'age', 'mobile_number')->where('id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))->orderBy('id', 'DESC')->first();
         $uhidNos = Session::get('current_branch_code') . ' -' . $patient_data->id;
         $data['patient_data'] = $patient_data;
         $data['uhidNo'] = $uhidNos;
@@ -1343,8 +1343,8 @@ else
     {
         $data = array();
         $data['PageName'] = "Vaccination";
-        $data['sessions'] = array('pid' => Session::get('dtms_pid'));
-        $patient_data = PatientRegistration::select('name', 'id', 'gender', 'dob', 'age', 'mobile_number')->where('id', Session::get('dtms_pid'))->orderBy('id', 'DESC')->first();
+        $data['sessions'] = array('pid' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')));
+        $patient_data = PatientRegistration::select('name', 'id', 'gender', 'dob', 'age', 'mobile_number')->where('id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))->orderBy('id', 'DESC')->first();
         $uhidNos = Session::get('current_branch_code') . ' -' . $patient_data->id;
         $data['patient_data'] = $patient_data;
         $data['uhidNo'] = $uhidNos;
@@ -1356,8 +1356,8 @@ else
     {
         $data = array();
         $data['PageName'] = "Miscellaneous";
-        $data['sessions'] = array('pid' => Session::get('dtms_pid'));
-        $patient_data = PatientRegistration::select('name', 'id', 'gender', 'dob', 'age', 'mobile_number')->where('id', Session::get('dtms_pid'))->orderBy('id', 'DESC')->first();
+        $data['sessions'] = array('pid' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')));
+        $patient_data = PatientRegistration::select('name', 'id', 'gender', 'dob', 'age', 'mobile_number')->where('id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))->orderBy('id', 'DESC')->first();
         $uhidNos = Session::get('current_branch_code') . ' -' . $patient_data->id;
         $data['patient_data'] = $patient_data;
         $data['uhidNo'] = $uhidNos;
@@ -1370,8 +1370,8 @@ else
     {
         $data = array();
         $data['PageName'] = "DTMS Dashboard";
-        $data['sessions'] = array('pid' => Session::get('dtms_pid'));
-        // $patient_data=PatientRegistration::select('name','id','gender','dob','age','mobile_number')->where('id',Session::get('dtms_pid'))->orderBy('id','DESC')->first();
+        $data['sessions'] = array('pid' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')));
+        // $patient_data=PatientRegistration::select('name','id','gender','dob','age','mobile_number')->where('id',(request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))->orderBy('id','DESC')->first();
         // $uhidNos=Session::get('current_branch_code').' -'.$patient_data->id;
         // $data['patient_data']=$patient_data;
         // $data['uhidNo']=$uhidNos;
@@ -1383,8 +1383,8 @@ else
     {
         $data = array();
         $data['PageName'] = "Visit Lists";
-        $data['sessions'] = array('pid' => Session::get('dtms_pid'));
-        // $patient_data=PatientRegistration::select('name','id','gender','dob','age','mobile_number')->where('id',Session::get('dtms_pid'))->orderBy('id','DESC')->first();
+        $data['sessions'] = array('pid' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')));
+        // $patient_data=PatientRegistration::select('name','id','gender','dob','age','mobile_number')->where('id',(request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))->orderBy('id','DESC')->first();
         // $uhidNos=Session::get('current_branch_code').' -'.$patient_data->id;
         // $data['patient_data']=$patient_data;
         // $data['uhidNo']=$uhidNos;
@@ -1541,7 +1541,7 @@ else
         //
         //                if($request->$answer!=null){
         //                    array_push($ins,
-        //                    ['patient_id' =>Session::get('dtms_pid'),
+        //                    ['patient_id' =>(request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
         //                    'question_id' =>$question_data['id'],
         //                    'answer' =>$request->$answer,
         //                    'notes' =>$request->$notes,
@@ -1555,7 +1555,7 @@ else
         //                }
         //
         //            }
-        //                PatientPep::where('patient_id',Session::get('dtms_pid'))->delete();
+        //                PatientPep::where('patient_id',(request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))->delete();
         //                $insert_id = PatientPep::insert($ins);
         //                    if($insert_id) {
         //                        return [ 'status'=>1, 'message'=>"Saved Successfully" ];
@@ -1568,17 +1568,17 @@ else
         $questions = DietQuestionMaster::where($cond)->select('id', 'question')->get();
         if (!$questions->isEmpty()) {
 
-            //                PatientPep::where('patient_id', Session::get('dtms_pid'))->delete();
+            //                PatientPep::where('patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))->delete();
             $pepDate = PatientAnswerSheet::whereDate('created_at', Carbon::today())
                 ->where('question_type_id', 2)
-                ->where('patient_id', Session::get('dtms_pid'))
+                ->where('patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))
                 ->first();
             if ($pepDate) {
                 return ['status' => 4, 'message' => "Pep already exist"];
             } else {
                 $pepAnswerSheetData = PatientAnswerSheet::create([
                     'question_type_id' => 2,
-                    'patient_id' => Session::get('dtms_pid'),
+                    'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 ]);
                 $questionData = [];
                 foreach ($questions as $question_data) {
@@ -1591,7 +1591,7 @@ else
                                 'answer_sheet_id' => $pepAnswerSheetData->id,
                                 'display_status' => 1,
                                 'branch_id' => Session::get('current_branch'),
-                                'patient_id' => Session::get('dtms_pid'),
+                                'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                                 'created_by' => Auth::id(),
                                 'is_deleted' => 0,
                                 'created_at' => Carbon::now(),
@@ -1622,7 +1622,7 @@ else
                     'qury_log' => $sql,
                     'description' => 'DTMS, Add Patient Education Module',
                     'created_date' => date('Y-m-d H:i:s'),
-                    'patient_id' => Session::get('dtms_pid'),
+                    'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 );
 
                 $save_history = $this->HistoryController->saveHistory($log);
@@ -1651,7 +1651,7 @@ else
         //
         //                if($request->$answer!=null){
         //                    array_push($ins,
-        //                    ['patient_id' =>Session::get('dtms_pid'),
+        //                    ['patient_id' =>(request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
         //                    'dietplan_id' =>$question_data['id'],
         //                    'dietplan_answer' =>$request->$answer,
         //                    'notes' =>$request->$notes,
@@ -1668,7 +1668,7 @@ else
         //
         //
         //
-        //                PatientDietPlan::where('patient_id',Session::get('dtms_pid'))->delete();
+        //                PatientDietPlan::where('patient_id',(request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))->delete();
         //                $insert_id = PatientDietPlan::insert($ins);
         //                    if($insert_id) {
         //                        return [ 'status'=>1, 'message'=>"Saved Successfully" ];
@@ -1685,14 +1685,14 @@ else
 
             $dietPlanDate = PatientAnswerSheet::whereDate('created_at', Carbon::today())
                 ->where('question_type_id', 1)
-                ->where('patient_id', Session::get('dtms_pid'))
+                ->where('patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))
                 ->first();
             if ($dietPlanDate) {
                 return ['status' => 4, 'message' => "Diet plan already exist"];
             } else {
                 $dietPlanAnswerSheetData = PatientAnswerSheet::create([
                     'question_type_id' => 1,
-                    'patient_id' => Session::get('dtms_pid'),
+                    'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 ]);
                 $questionData = [];
                 foreach ($questions as $question_data) {
@@ -1706,7 +1706,7 @@ else
                                 'answer_sheet_id' => $dietPlanAnswerSheetData->id,
                                 'display_status' => 1,
                                 'branch_id' => Session::get('current_branch'),
-                                'patient_id' => Session::get('dtms_pid'),
+                                'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                                 'created_by' => Auth::id(),
                                 'is_deleted' => 0,
                                 'created_at' => Carbon::now(),
@@ -1736,7 +1736,7 @@ else
                     'qury_log' => $sql,
                     'description' => 'DTMS, Save Patient DietPlan',
                     'created_date' => date('Y-m-d H:i:s'),
-                    'patient_id' => Session::get('dtms_pid'),
+                    'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 );
 
                 $save_history = $this->HistoryController->saveHistory($log);
@@ -1815,7 +1815,7 @@ else
                 'qury_log' => $sql,
                 'description' => 'DTMS ,Delete Patient Document',
                 'created_date' => date('Y-m-d H:i:s'),
-                'patient_id' => Session::get('dtms_pid'),
+                'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
             );
 
             $save_history = $this->HistoryController->saveHistory($log);
@@ -1832,7 +1832,7 @@ else
     {
         $insert_id = "";
         $ins = array(
-            'patient_id' => Session::get('dtms_pid'),
+            'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
 
             // 'present_illness' => $request->present_illness,
             'chief_complaints' => $request->chief_complaints,
@@ -1881,7 +1881,7 @@ else
                 'qury_log' => $sql,
                 'description' => 'DTMS, Add Medical History',
                 'created_date' => date('Y-m-d H:i:s'),
-                'patient_id' => Session::get('dtms_pid'),
+                'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
             );
 
             $save_history = $this->HistoryController->saveHistory($log);
@@ -1897,8 +1897,8 @@ else
         } else if ($request->crude == 2) {
             $ins['updated_by'] = Auth::id();
             DB::connection()->enableQueryLog(); // enable qry log
-            // dd(Session::get('dtms_pid'));
-            $insert_id = PatientMedicalHistory::where('patient_id', Session::get('dtms_pid'))->update($ins);
+            // dd((request()->input('dtms_patient_id') ?? Session::get('dtms_pid')));
+            $insert_id = PatientMedicalHistory::where('patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))->update($ins);
 
             // TO GET LAST EXECUTED QRY
             $query = DB::getQueryLog();
@@ -1910,14 +1910,14 @@ else
 
             // LOG  // add parameters based on your need
             $log = array(
-                'primarykeyvalue_Id' => Session::get('dtms_pid'),
+                'primarykeyvalue_Id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 'user_id' => Auth::id(), // userId
                 'log_type' => 2, // Update
                 'table_name' => 'PatientMedicalHistory', // Update Medical History
                 'qury_log' => $sql,
                 'description' => 'DTMS, Update Medical History',
                 'created_date' => date('Y-m-d H:i:s'),
-                'patient_id' => Session::get('dtms_pid'),
+                'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
             );
 
             $save_history = $this->HistoryController->saveHistory($log);
@@ -1936,12 +1936,12 @@ else
         // dd(session()->all());
         //  exit;
         // Bp Status
-        if ($request->session()->exists('dtms_visitid')) {
+        if ((!empty(request()->input('dtms_visitid')) || $request->session()->exists('dtms_visitid'))) {
             $bpStatusData = [];
             for ($i = 1; $i <= 4; $i++) {
                 if ('' != $request->get('bps_status_time_' . $i)) {
                     $bpStatusData[] = [
-                        'visit_id' => Session::get('dtms_visitid'),
+                        'visit_id' => (request()->input('dtms_visitid') ?? Session::get('dtms_visitid')),
                         'time' => $request->get('bps_status_time_' . $i),
                         'bps' => $request->get('bps_status_bps_' . $i),
                         'bpd' => $request->get('bps_status_bpd_' . $i),
@@ -1956,7 +1956,7 @@ else
                 }
             }
             if (!empty($bpStatusData)) {
-                PatientBpStatus::where('visit_id', Session::get('dtms_visitid'))->delete();
+                PatientBpStatus::where('visit_id', (request()->input('dtms_visitid') ?? Session::get('dtms_visitid')))->delete();
 
                 DB::connection()->enableQueryLog(); // enable qry log
 
@@ -1972,14 +1972,14 @@ else
 
                 // LOG  // add parameters based on your need
                 $log = array(
-                    'primarykeyvalue_Id' => Session::get('dtms_visitid'),
+                    'primarykeyvalue_Id' => (request()->input('dtms_visitid') ?? Session::get('dtms_visitid')),
                     'user_id' => Auth::id(), // userId
                     'log_type' => 1, // Save
                     'table_name' => 'PatientBpStatus', // Save Bp status
                     'qury_log' => $sql,
                     'description' => 'DTMS, Add Bp Status',
                     'created_date' => date('Y-m-d H:i:s'),
-                    'patient_id' => Session::get('dtms_pid'),
+                    'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 );
 
                 $save_history = $this->HistoryController->saveHistory($log);
@@ -1992,17 +1992,17 @@ else
         $vitalsLists = VitalsMaster::select('vitals_master.*')->orderBy('id', 'DESC')->get();
         if (!$vitalsLists->isEmpty()) {
             $vitalData = [];
-            if ($request->session()->exists('dtms_visitid')) {
+            if ((!empty(request()->input('dtms_visitid')) || $request->session()->exists('dtms_visitid'))) {
                 foreach ($vitalsLists as $item) {
                     if ($request->has('vital_' . $item->id)) {
                         if ('' != $request->get('vital_' . $item->id)) {
                             $vitalData[] = [
-                                'visit_id' => Session::get('dtms_visitid'),
+                                'visit_id' => (request()->input('dtms_visitid') ?? Session::get('dtms_visitid')),
                                 'vitals_id' => $item->id,
                                 'vitals_value' => $request->get('vital_' . $item->id),
                                 'display_status' => 1,
                                 'branch_id' => Session::get('current_branch'),
-                                'patient_id' => Session::get('dtms_pid'),
+                                'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                                 'created_by' => Auth::id(),
                                 'is_deleted' => 0,
                                 'created_at' => Carbon::now(),
@@ -2012,7 +2012,7 @@ else
                     }
                 }
                 if (!empty($vitalData)) {
-                    PatientVitals::where('visit_id', Session::get('dtms_visitid'))->delete();
+                    PatientVitals::where('visit_id', (request()->input('dtms_visitid') ?? Session::get('dtms_visitid')))->delete();
 
                     DB::connection()->enableQueryLog(); // enable qry log
 
@@ -2028,14 +2028,14 @@ else
 
                     // LOG  // add parameters based on your need
                     $log = array(
-                        'primarykeyvalue_Id' => Session::get('dtms_visitid'),
+                        'primarykeyvalue_Id' => (request()->input('dtms_visitid') ?? Session::get('dtms_visitid')),
                         'user_id' => Auth::id(), // userId
                         'log_type' => 1, // Save
                         'table_name' => 'VitalsMaster', // Save Vitals details
                         'qury_log' => $sql,
                         'description' => 'DTMS, Add Vitals Sign Details',
                         'created_date' => date('Y-m-d H:i:s'),
-                        'patient_id' => Session::get('dtms_pid'),
+                        'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                     );
 
                     $save_history = $this->HistoryController->saveHistory($log);
@@ -2049,7 +2049,7 @@ else
         $patientLists = TestMaster::select('test_master.TestId')->where('show_test_in_targets', 1)->orderBy('id', 'DESC')->get();
         if (!$patientLists->isEmpty()) {
             $targetData = [];
-            if ($request->session()->exists('dtms_visitid')) {
+            if ((!empty(request()->input('dtms_visitid')) || $request->session()->exists('dtms_visitid'))) {
                 foreach ($patientLists as $item) {
                     if ($request->has('patient_target_' . $item->TestId)) {
                         if ('' != $request->get('patient_target_' . $item->TestId) || '' != $request->get('patient_present_' . $item->TestId)) {
@@ -2061,11 +2061,11 @@ else
                             if ($target_pre == "" || !$target_pre) $target_pre = "";
 
                             $targetData[] = [
-                                'visit_id' => Session::get('dtms_visitid'),
+                                'visit_id' => (request()->input('dtms_visitid') ?? Session::get('dtms_visitid')),
                                 'test_id' => $item->TestId,
                                 'target_value' => $target_set,
                                 'present_value' => $target_pre,
-                                'patient_id' => Session::get('dtms_pid'),
+                                'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                                 'created_at' => Carbon::now(),
                                 'updated_at' => Carbon::now(),
                             ];
@@ -2073,7 +2073,7 @@ else
                     }
                 }
                 if (!empty($targetData)) {
-                    PatientTarget::where('visit_id', Session::get('dtms_visitid'))->delete();
+                    PatientTarget::where('visit_id', (request()->input('dtms_visitid') ?? Session::get('dtms_visitid')))->delete();
                     DB::connection()->enableQueryLog(); // enable qry log
                     PatientTarget::insert($targetData);
                     // TO GET LAST EXECUTED QRY
@@ -2086,14 +2086,14 @@ else
 
                     // LOG  // add parameters based on your need
                     $log = array(
-                        'primarykeyvalue_Id' => Session::get('dtms_visitid'),
+                        'primarykeyvalue_Id' => (request()->input('dtms_visitid') ?? Session::get('dtms_visitid')),
                         'user_id' => Auth::id(), // userId
                         'log_type' => 1, // Save
                         'table_name' => 'PatientTarget', // Save Patient target
                         'qury_log' => $sql,
                         'description' => 'DTMS, Save Patient target',
                         'created_date' => date('Y-m-d H:i:s'),
-                        'patient_id' => Session::get('dtms_pid'),
+                        'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                     );
 
                     $save_history = $this->HistoryController->saveHistory($log);
@@ -2104,15 +2104,15 @@ else
         }
 
         // Patient target detail
-        if ($request->session()->exists('dtms_visitid')) {
+        if ((!empty(request()->input('dtms_visitid')) || $request->session()->exists('dtms_visitid'))) {
             DB::connection()->enableQueryLog(); // enable qry log
             PatientTargetDetail::updateOrCreate(
-                ['patient_id' => Session::get('dtms_pid')],
+                ['patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid'))],
                 [
                     'weight_target' => $request->get('weight_target'),
                     'weight_present' => $request->get('weight_present'),
                     'action_plan' => $request->get('action_plan'),
-                    'visit_id' => Session::get('dtms_visitid'),
+                    'visit_id' => (request()->input('dtms_visitid') ?? Session::get('dtms_visitid')),
                 ]
             );
 
@@ -2126,14 +2126,14 @@ else
 
             // LOG  // add parameters based on your need
             $log = array(
-                'primarykeyvalue_Id' => Session::get('dtms_visitid'),
+                'primarykeyvalue_Id' => (request()->input('dtms_visitid') ?? Session::get('dtms_visitid')),
                 'user_id' => Auth::id(), // userId
                 'log_type' => 1, // Save
                 'table_name' => 'PatientTargetDetail', // Save Patient target detail
                 'qury_log' => $sql,
                 'description' => 'DTMS, Save Patient target detail',
                 'created_date' => date('Y-m-d H:i:s'),
-                'patient_id' => Session::get('dtms_pid'),
+                'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
             );
 
             $save_history = $this->HistoryController->saveHistory($log);
@@ -2149,7 +2149,7 @@ else
 
             // DB::connection()->enableQueryLog(); // enable qry log
 
-                            PatientVisits::where('id', Session::get('dtms_visitid'))->update([
+                            PatientVisits::where('id', (request()->input('dtms_visitid') ?? Session::get('dtms_visitid')))->update([
                                 // 'visit_date' =>$visitDate ,
                                 'dtms_remarks' => $request->get('remark'),
                                // 'dtms_visitdate' => $visitDate,
@@ -2165,14 +2165,14 @@ else
 
             // // LOG  // add parameters based on your need
             // $log=array(
-            // 'primarykeyvalue_Id'=>Session::get('dtms_visitid'),
+            // 'primarykeyvalue_Id'=>(request()->input('dtms_visitid') ?? Session::get('dtms_visitid')),
             // 'user_id'=>Auth::id(), // userId
             // 'log_type'=>1, // Save
             // 'table_name'=>'PatientVisits', // Save Remarks
             // 'qury_log'=>$sql,
             // 'description'=>'DTMS, Save Remarks',
             // 'created_date'=>date('Y-m-d H:i:s'),
-            // 'patient_id'=>Session::get('dtms_pid'),
+            // 'patient_id'=>(request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
             // );
 
             // $save_history = $this->HistoryController->saveHistory($log);
@@ -2181,26 +2181,26 @@ else
         }
 
         // updating prescriptions
-        if ($request->session()->exists('dtms_visitid')) {
+        if ((!empty(request()->input('dtms_visitid')) || $request->session()->exists('dtms_visitid'))) {
 
             $prrescriptionData = [];
             // dd('hii');
             if ($request->medicine_idlist != "") {
 
-                PatientPrescriptions::where('visit_id', Session::get('dtms_visitid'))->delete();
+                PatientPrescriptions::where('visit_id', (request()->input('dtms_visitid') ?? Session::get('dtms_visitid')))->delete();
 
                 foreach ($request->medicine_idlist as $key => $pres) {
 
                     if ($pres) {
                         $prrescriptionData[] = [
-                            'visit_id' => Session::get('dtms_visitid'),
+                            'visit_id' => (request()->input('dtms_visitid') ?? Session::get('dtms_visitid')),
                             'tablet_type_id' => $request->tablet_type_idlist[$key],
                             'dose'  => $request->doselist[$key],
                             'medicine_id' => $pres,
                             'remarks'  => $request->remarkslist[$key],
                             'display_status' => 1,
                             'branch_id' => Session::get('current_branch'),
-                            'patient_id' => Session::get('dtms_pid'),
+                            'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                             'created_by' => Auth::id(),
                             'is_deleted' => 0,
                             'created_at' => Carbon::now(),
@@ -2221,14 +2221,14 @@ else
 
                 // LOG  // add parameters based on your need
                 $log = array(
-                    'primarykeyvalue_Id' => Session::get('dtms_visitid'),
+                    'primarykeyvalue_Id' => (request()->input('dtms_visitid') ?? Session::get('dtms_visitid')),
                     'user_id' => Auth::id(), // userId
                     'log_type' => 1, // Save
                     'table_name' => 'PatientPrescriptions', // Save  prescriptions
                     'qury_log' => $sql,
                     'description' => 'DTMS, Save  prescriptions',
                     'created_date' => date('Y-m-d H:i:s'),
-                    'patient_id' => Session::get('dtms_pid'),
+                    'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 );
 
                 $save_history = $this->HistoryController->saveHistory($log);
@@ -2257,7 +2257,7 @@ else
         // if($visitId=="")
         // {
         //     $cond=array(
-        //         array('patient_id',Session::get('dtms_pid')),
+        //         array('patient_id',(request()->input('dtms_patient_id') ?? Session::get('dtms_pid'))),
         //     );
         //     $visitId= getAfeildByOrder("id","patient_visits",$cond,'id','DESC');
         // }
@@ -2275,7 +2275,7 @@ else
             from test_master as tm
             left join
             (select "ResultValue","is_outside_lab","visit_id","TestId","is_smbg" from test_results where "visit_id"=
-                (select id from patient_visits where patient_id=' . Session::get('dtms_pid') . ' order by id desc limit 1)
+                (select id from patient_visits where patient_id=' . (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')) . ' order by id desc limit 1)
             ) as tr
             on tr."TestId"=tm."TestId" where  tm."show_test_in_dtms"=1  order by tm.dtms_order_no ASC';
         }
@@ -2297,7 +2297,7 @@ else
             if (is_null($visitId)) {
                 // process while first page load
                 $testResultLatestValue = TestResults::where('TestId', $item->TestId)
-                    ->where('PatientId', Session::get('dtms_pid'))
+                    ->where('PatientId', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))
                     ->orderByDesc('id')
                     ->first();
                 $patientTargetList[] = [
@@ -2309,7 +2309,7 @@ else
                // On click of test result
                 $testResultValue = TestResults::where('visit_id', $visitId)
                     ->where('TestId', $item->TestId)
-                    ->where('PatientId', Session::get('dtms_pid'))
+                    ->where('PatientId', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))
                     ->orderByDesc('id')
                     ->first();
                 if (! is_null($testResultValue)) {
@@ -2374,7 +2374,7 @@ else
         //        // to get previous test data
         //        $patientVisitList = PatientVisits::select('patient_visits.visit_type_id', 'patient_visits.id','patient_visits.visit_code', 'patient_visits.visit_date', 'visit_type_master.visit_type_name')
         //            ->join('visit_type_master','visit_type_master.id','=','patient_visits.visit_type_id')
-        //            ->where('patient_id',Session::get('dtms_pid'))
+        //            ->where('patient_id',(request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))
         //            ->orderByDesc('patient_visits.id')
         //            ->get();
         //        foreach($patientVisitList as $patientListValue) {
@@ -2437,7 +2437,7 @@ else
             ->join('visit_type_master', 'visit_type_master.id', '=', 'patient_visits.visit_type_id')
             ->where('patient_visits.id', $request->id)
             ->first();
-        $uhidNos = Session::get('current_branch_code') . ' -' . Session::get('dtms_pid');
+        $uhidNos = Session::get('current_branch_code') . ' -' . (request()->input('dtms_patient_id') ?? Session::get('dtms_pid'));
 
         $prescriptionData = PatientPrescriptions::select('medicine_master.medicine_name', 'medicine_master.generic_name', 'tablet_type_master.tablet_type_name','tablet_type_master.tab', 'patient_prescriptions.*')
             ->join('medicine_master', 'medicine_master.id', '=', 'patient_prescriptions.medicine_id')
@@ -2452,7 +2452,7 @@ else
         $data['prescriptionData'] = $prescriptionData;
         $data['patient_test_targets'] = $targetMainArray;
         $data['patient_target_details'] = $patientTargetData;
-        $data['dtms_visitid'] = Session::get('dtms_visitid');
+        $data['dtms_visitid'] = (request()->input('dtms_visitid') ?? Session::get('dtms_visitid'));
         $data['uhidNo'] = $uhidNos;
 
 
@@ -2492,7 +2492,7 @@ else
         $data = array();
         $patientDiagnosis = PatientDiagnosis::select('diagnosis_master.diagnosis_name', 'patient_diagnosis.diagnosis_year')
             ->join('diagnosis_master', 'diagnosis_master.id', '=', 'patient_diagnosis.diagnosis_id')
-            ->where('patient_id', Session::get('dtms_pid'))
+            ->where('patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))
             ->where('patient_diagnosis.is_deleted', 0)
             ->orderByDesc('patient_diagnosis.id')
             ->get();
@@ -2500,7 +2500,7 @@ else
         $patientComplication = PatientComplication::select('complication_master.complication_name',  'patient_complication.complication_year')
             ->join('complication_master', 'complication_master.id', '=', 'patient_complication.complication_id')
             // ->join('subcomplication_master', 'subcomplication_master.id', '=', 'patient_complication.sub_complication_id')
-            ->where('patient_id', Session::get('dtms_pid'))
+            ->where('patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))
             ->where('patient_complication.is_deleted', 0)
             ->orderByDesc('patient_complication.id')
             ->get();
@@ -2580,7 +2580,7 @@ else
                 'created_by' => Auth::id(),
                 'branch_id' => Session::get('current_branch'),
                 'is_deleted' => 0,
-                'patient_id' => Session::get('dtms_pid'),
+                'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
             );
 
             if ($request->crude == 1) {
@@ -2609,7 +2609,7 @@ else
                     'qury_log' => $sql,
                     'description' => 'DTMS, Save Vaccination Data',
                     'created_date' => date('Y-m-d H:i:s'),
-                    'patient_id' => Session::get('dtms_pid'),
+                    'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 );
 
                 $save_history = $this->HistoryController->saveHistory($log);
@@ -2648,7 +2648,7 @@ else
                     'qury_log' => $sql,
                     'description' => 'DTMS, Update Vaccination Data',
                     'created_date' => date('Y-m-d H:i:s'),
-                    'patient_id' => Session::get('dtms_pid'),
+                    'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 );
 
                 $save_history = $this->HistoryController->saveHistory($log);
@@ -2674,7 +2674,7 @@ else
     public function getVaccinationData()
     {
         $cond = array();
-        array_push($cond, ['patient_vaccination.patient_id', Session::get('dtms_pid')]);
+        array_push($cond, ['patient_vaccination.patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid'))]);
         array_push($cond, ['patient_vaccination.is_deleted', 0]);
         $filldata = PatientVaccination::select('patient_vaccination.*', 'vaccination_master.vaccination_name')
             ->join('vaccination_master', 'vaccination_master.id', '=', 'patient_vaccination.vaccination_id')
@@ -2703,10 +2703,10 @@ else
         ]);
         if ($validated) {
             $insert_id = "";
-            $alertLists = PatientAlerts::select('patient_alert.*')->where('patient_id', Session::get('dtms_pid'))->orderBy('id', 'DESC')->get();
+            $alertLists = PatientAlerts::select('patient_alert.*')->where('patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))->orderBy('id', 'DESC')->get();
             $alertData = [];
             $alertData = [
-                'patient_id' => Session::get('dtms_pid'),
+                'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 'alerts' => $request->get('alerts'),
                 'branch_id' => Session::get('current_branch'),
                 'display_status' => 1,
@@ -2715,9 +2715,9 @@ else
             ];
             if (!$alertLists->isEmpty()) {
                 $alertData['updated_at'] = Carbon::now();
-                //    dd(Session::get('dtms_pid'));
+                //    dd((request()->input('dtms_patient_id') ?? Session::get('dtms_pid')));
                 DB::connection()->enableQueryLog(); // enable qry log
-                $insert_id = PatientAlerts::where('patient_id', Session::get('dtms_pid'))->update($alertData);
+                $insert_id = PatientAlerts::where('patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))->update($alertData);
 
                 // TO GET LAST EXECUTED QRY
                 $query = DB::getQueryLog();
@@ -2729,14 +2729,14 @@ else
 
                 // LOG  // add parameters based on your need
                 $log = array(
-                    'primarykeyvalue_Id' => Session::get('dtms_pid'),
+                    'primarykeyvalue_Id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                     'user_id' => Auth::id(), // userId
                     'log_type' => 2, // Update
                     'table_name' => 'PatientAlerts', // Update AlertData
                     'qury_log' => $sql,
                     'description' => 'DTMS , Update AlertData ',
                     'created_date' => date('Y-m-d H:i:s'),
-                    'patient_id' => Session::get('dtms_pid'),
+                    'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 );
 
                 $save_history = $this->HistoryController->saveHistory($log);
@@ -2799,7 +2799,7 @@ else
     {
         $data = array();
         $patientAlertData = PatientAlerts::select('id', 'alerts', 'psychiatric_medications')
-            ->where('patient_id', Session::get('dtms_pid'))
+            ->where('patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))
             ->orderByDesc('id')
             ->first();
 
@@ -2809,7 +2809,7 @@ else
     ///// get pumb details data//////
     public function getpumpDetailstData()
     {
-        $getpumbData = PumpDetails::select('id', 'modal_number', 'remarks')->where('patient_id', Session::get('dtms_pid'))->orderByDesc('id')->get();
+        $getpumbData = PumpDetails::select('id', 'modal_number', 'remarks')->where('patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))->orderByDesc('id')->get();
         $output = array(
             "recordsTotal" => count($getpumbData),
             "recordsFiltered" => count($getpumbData),
@@ -2823,7 +2823,7 @@ else
 
 
         $cond = array();
-        array_push($cond, ['test_results.PatientId', Session::get('dtms_pid')]);
+        array_push($cond, ['test_results.PatientId', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid'))]);
         array_push($cond, ['test_results.is_smbg', 1]);
 
 
@@ -2861,7 +2861,7 @@ else
     {
         $insertData = array(
             'remainder_text' => $request->remanider,
-            'patient_id' => Session::get('dtms_pid'),
+            'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
             'created_at' => Carbon::now()
         );
         $data = Remainder::insert($insertData);
@@ -2885,7 +2885,7 @@ else
     /////////get remainder data//////////
     public function getremainerData()
     {
-        $patient_id = Session::get('dtms_pid');
+        $patient_id = (request()->input('dtms_patient_id') ?? Session::get('dtms_pid'));
         $data = Remainder::select('id', 'remainder_text')->where('patient_id', $patient_id)->get();
         if ($data) {
             $output = array(
@@ -2903,7 +2903,7 @@ else
 
 
         $pumbData = [
-            'patient_id' => Session::get('dtms_pid'),
+            'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
             'modal_number' => $request->modelnumber,
             'remarks' =>  $request->remakrs,
             'display_status' => 1,
@@ -2924,14 +2924,14 @@ else
 
         // LOG  // add parameters based on your need
         $log = array(
-            'primarykeyvalue_Id' => Session::get('dtms_pid'),
+            'primarykeyvalue_Id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
             'user_id' => Auth::id(), // userId
             'log_type' => 1, // save
             'table_name' => 'PumpDetails', // Save pump data
             'qury_log' => $sql,
             'description' => 'DTMS ,Save Pump  Data Details',
             'created_date' => date('Y-m-d H:i:s'),
-            'patient_id' => Session::get('dtms_pid'),
+            'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
         );
 
         $save_history = $this->HistoryController->saveHistory($log);
@@ -3029,7 +3029,7 @@ else
             $ins_data['updated_by'] = Auth::id();
             DB::connection()->enableQueryLog(); // enable qry log
 
-            $insert_id = PatientRegistration::where('id', Session::get('dtms_pid'))->update($ins_data);
+            $insert_id = PatientRegistration::where('id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))->update($ins_data);
 
             // TO GET LAST EXECUTED QRY
             $query = DB::getQueryLog();
@@ -3041,14 +3041,14 @@ else
 
             // LOG  // add parameters based on your need
             $log = array(
-                'primarykeyvalue_Id' => Session::get('dtms_pid'),
+                'primarykeyvalue_Id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 'user_id' => Auth::id(), // userId
                 'log_type' => 2, // Update
                 'table_name' => 'PatientRegistration', // Save Patient data
                 'qury_log' => $sql,
                 'description' => 'DTMS ,Update Patient  Details',
                 'created_date' => date('Y-m-d H:i:s'),
-                'patient_id' => Session::get('dtms_pid'),
+                'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
             );
 
             $save_history = $this->HistoryController->saveHistory($log);
@@ -3066,10 +3066,10 @@ else
     {
         $input = $request->all();
 
-        //        FormEngineAnswers::where('patient_id',Session::get('dtms_pid'))->delete();
+        //        FormEngineAnswers::where('patient_id',(request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))->delete();
         $miscellaneousDate = PatientAnswerSheet::whereDate('created_at', Carbon::today())
             ->where('question_type_id', 3)
-            ->where('patient_id', Session::get('dtms_pid'))
+            ->where('patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))
             ->first();
         if ($miscellaneousDate) {
             return ['status' => 4, 'message' => "Miscellaneous  already exist"];
@@ -3077,7 +3077,7 @@ else
 
             $miscellaneousAnswerSheetData = PatientAnswerSheet::create([
                 'question_type_id' => 3,
-                'patient_id' => Session::get('dtms_pid'),
+                'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
             ]);
             foreach ($input as $key => $value) {
 
@@ -3118,7 +3118,7 @@ else
                     'created_by' => Auth::id(),
                     'branch_id' => Session::get('current_branch'),
                     'is_deleted' => 0,
-                    'patient_id' => Session::get('dtms_pid'),
+                    'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                     'created_at' => date('Y-m-d h:i:s')
 
                 );
@@ -3145,7 +3145,7 @@ else
                 //     'qury_log' => $sql,
                 //     'description' => 'DTMS ,Save Miscellaneous FormEngine Answers',
                 //     'created_date' => date('Y-m-d H:i:s'),
-                //     'patient_id' => Session::get('dtms_pid'),
+                //     'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 // );
 
                 // $save_history = $this->HistoryController->saveHistory($log);
@@ -3158,7 +3158,7 @@ else
 
             if ($input['relation']) {
 
-                //            PatientHereditaryDetails::where('patient_id',Session::get('dtms_pid'))->delete();
+                //            PatientHereditaryDetails::where('patient_id',(request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))->delete();
                 $herdetails = array();
                 foreach ($input['relation'] as $key => $value) {
 
@@ -3187,7 +3187,7 @@ else
                             'created_by' => Auth::id(),
                             'branch_id' => Session::get('current_branch'),
                             'is_deleted' => 0,
-                            'patient_id' => Session::get('dtms_pid'),
+                            'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                             'created_at' => date('Y-m-d h:i:s')
 
 
@@ -3212,7 +3212,7 @@ else
                             'qury_log' => $sql,
                             'description' => 'DTMS, Save Miscellaneous PatientHereditary Details',
                             'created_date' => date('Y-m-d H:i:s'),
-                            'patient_id' => Session::get('dtms_pid'),
+                            'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                         );
 
                         $save_history = $this->HistoryController->saveHistory($log);
@@ -3228,7 +3228,7 @@ else
 
                 PatientMiscellaneousDetails::updateOrCreate(
                     [
-                        'patient_id'   => Session::get('dtms_pid'),
+                        'patient_id'   => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                     ],
                     [
                         'height' => $input['bmi_height'],
@@ -3263,7 +3263,7 @@ else
                 //     'qury_log' => $sql,
                 //     'description' => 'DTMS, PatientMiscellaneous Details',
                 //     'created_date' => date('Y-m-d H:i:s'),
-                //     'patient_id' => Session::get('dtms_pid'),
+                //     'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 // );
 
                 // $save_history = $this->HistoryController->saveHistory($log);
@@ -3280,7 +3280,7 @@ else
 
     public function getHeriditarydetails()
     {
-        $PatientMiscellaneousDetails = PatientHereditaryDetails::where('patient_id', Session::get('dtms_pid'))
+        $PatientMiscellaneousDetails = PatientHereditaryDetails::where('patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))
             ->orderByDesc('answer_sheet_id')
             // ->limit(1)
             ->get();
@@ -3309,7 +3309,7 @@ else
                 'phone_no' => $request->get('phone_no'),
                 'email_id' => $request->get('email'),
                 'address' => $request->get('address'),
-                'patient_id' => Session::get('dtms_pid'),
+                'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 'branch_id' => Session::get('current_branch'),
                 'display_status' => 1,
                 'is_deleted' => 0,
@@ -3340,7 +3340,7 @@ else
                     'qury_log' => $sql,
                     'description' => 'DTMS ,Save  Abroad Detail',
                     'created_date' => date('Y-m-d H:i:s'),
-                    'patient_id' => Session::get('dtms_pid'),
+                    'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 );
 
                 $save_history = $this->HistoryController->saveHistory($log);
@@ -3367,7 +3367,7 @@ else
     public function getAbroadData()
     {
         $cond = array();
-        array_push($cond, ['patient_id', Session::get('dtms_pid')]);
+        array_push($cond, ['patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid'))]);
         array_push($cond, ['is_deleted', 0]);
         $filldata = PatientAbroadDetail::select('patient_abroad_details.*')
             ->where($cond)
@@ -3402,7 +3402,7 @@ else
                 'branch_id' => Session::get('current_branch'),
                 'display_status' => ($request->display_status == 'on') ? "1" : "0",
                 'is_deleted' => 0,
-                'patient_id' => Session::get('dtms_pid'),
+                'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
             ];
             if ($request->crude == 1) {
                 $ins['created_at'] = Carbon::now();
@@ -3412,7 +3412,7 @@ else
                     array('remarks', $request->patient_reminder_remark),
                     array('date', date("Y-m-d", strtotime($request->patient_reminder_date))),
                     array('is_deleted', 0),
-                    array('patient_id',  Session::get('dtms_pid')),
+                    array('patient_id',  (request()->input('dtms_patient_id') ?? Session::get('dtms_pid'))),
                 );
 
                 $getId = getAfeild("id", "patient_reminders", $cond);
@@ -3498,7 +3498,7 @@ else
     public function getPatientReminders()
     {
         $cond = array();
-        array_push($cond, ['patient_reminders.patient_id', Session::get('dtms_pid')]);
+        array_push($cond, ['patient_reminders.patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid'))]);
         array_push($cond, ['patient_reminders.is_deleted', 0]);
         $filldata = PatientRegistration::select('patient_registration.uhidno', 'patient_reminders.*', 'users.name')
             ->leftjoin('patient_reminders', 'patient_reminders.patient_id', '=', 'patient_registration.id')
@@ -3563,7 +3563,7 @@ else
 
     public function getPatientGFRdetails()
     {
-        $PatientMiscellaneousDetails = PatientMiscellaneousDetails::where('patient_id', Session::get('dtms_pid'))
+        $PatientMiscellaneousDetails = PatientMiscellaneousDetails::where('patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))
             ->first();
 
         echo json_encode($PatientMiscellaneousDetails);
@@ -3596,7 +3596,7 @@ else
                 'visit_type_id' => $request->visit_type_id,
                 'specialist_id' => $request->specialist,
                 'visit_date' => $request->new_visit_date ? date("Y-m-d", strtotime($request->new_visit_date)) : NULL,
-                // 'patient_id'=>Session::get('dtms_pid'),
+                // 'patient_id'=>(request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
 
                 // 'updated_by' => Auth::id(),
                 // 'updated_at' => Carbon::now(),
@@ -3606,7 +3606,7 @@ else
             array_push($cond, ['visit_date', '=', $update_date]);
             array_push($cond, ['specialist_id', '=', $request->specialist]);
 
-            array_push($cond, ['patient_id', Session::get('dtms_pid')]);
+            array_push($cond, ['patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid'))]);
 
             $value = getAfeild("id", "patient_visits", $cond);
             if ($value) {
@@ -3716,14 +3716,14 @@ else
             $visitData[$value->id] = [
                 'visit_name' => $value->visit_type_name,
                 'visit_count' => PatientVisits::select(DB::raw('count(*) as total'))
-                    ->where('patient_id', Session::get('dtms_pid'))
+                    ->where('patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))
                     ->where('visit_type_id', $value->id)->count(),
             ];
         }
 
         $patientVisitList = PatientVisits::select('patient_visits.visit_type_id', 'patient_visits.id', 'patient_visits.specialist_id', 'patient_visits.visit_code', 'patient_visits.visit_date', 'visit_type_master.visit_type_name')
             ->join('visit_type_master', 'visit_type_master.id', '=', 'patient_visits.visit_type_id')
-            ->where('patient_id', Session::get('dtms_pid'))
+            ->where('patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))
             ->orderByDesc('patient_visits.visit_date')
             ->get();
         $patientVisitElements = "";
@@ -3771,7 +3771,7 @@ else
                 'qury_log' => $sql,
                 'description' => 'DTMS ,Delete Patient AbroadDetail',
                 'created_date' => date('Y-m-d H:i:s'),
-                'patient_id' => Session::get('dtms_pid'),
+                'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
             );
 
             $save_history = $this->HistoryController->saveHistory($log);
@@ -3908,7 +3908,7 @@ else
                 'qury_log' => $sql,
                 'description' => 'DTMS, Delete Vaccination Data',
                 'created_date' => date('Y-m-d H:i:s'),
-                'patient_id' => Session::get('dtms_pid'),
+                'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
             );
 
             $save_history = $this->HistoryController->saveHistory($log);
@@ -3968,7 +3968,7 @@ else
                 'qury_log' => $sql,
                 'description' => 'DTMS, Save Patient Visits Data',
                 'created_date' => date('Y-m-d H:i:s'),
-                'patient_id' => Session::get('dtms_pid'),
+                'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
             );
 
             $save_history = $this->HistoryController->saveHistory($log);
@@ -4001,7 +4001,7 @@ else
         if ($validated) {
             $previousVisitTypeId = PatientVisits::where('id', $request->hid_visit_id)->select('visit_type_id')->first();
             $visitData = array(
-                //  'patient_id' =>Session::get('dtms_pid'),
+                //  'patient_id' =>(request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 //   'id'=> $request->hid_visit_id,
                 'visit_type_id' => $request->visit_type_id,
                 'visit_date' => date("Y-m-d", strtotime($request->visit_date)),
@@ -4071,7 +4071,7 @@ else
         )
             ->leftjoin('specialist_master', 'specialist_master.id', '=', 'patient_registration.specialist_id')
             ->leftjoin('patient_visits', 'patient_visits.patient_id', '=', 'patient_registration.id')
-            ->where('patient_registration.id', Session::get('dtms_pid'))
+            ->where('patient_registration.id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))
             ->first();
         $prescriptionData = PatientPrescriptions::select(
             'medicine_master.medicine_name',
@@ -4082,8 +4082,8 @@ else
         )
             ->leftjoin('medicine_master', 'medicine_master.id', '=', 'patient_prescriptions.medicine_id')
             ->leftjoin('tablet_type_master', 'tablet_type_master.id', '=', 'medicine_master.tablet_type_id')
-            ->where('visit_id', Session::get('dtms_visitid'))
-            ->where('patient_id', Session::get('dtms_pid'))
+            ->where('visit_id', (request()->input('dtms_visitid') ?? Session::get('dtms_visitid')))
+            ->where('patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))
             ->where('patient_prescriptions.is_deleted', 0)
             ->orderBy('patient_prescriptions.id', 'ASC')
             ->get();
@@ -4091,7 +4091,7 @@ else
         $data['prescriptionData'] = $prescriptionData;
 
         $cond = [];
-        array_push($cond, ['id', Session::get('dtms_visitid')]);
+        array_push($cond, ['id', (request()->input('dtms_visitid') ?? Session::get('dtms_visitid'))]);
         $specialist_id = getAfeild("specialist_id", "patient_visits", $cond);
         if ($specialist_id > 0) {
             $cond = [];
@@ -4103,7 +4103,7 @@ else
         $data['doctor_name'] = $specialist_name;
 //jdc
 $cond = [];
-array_push($cond, ['id', Session::get('dtms_visitid')]);
+array_push($cond, ['id', (request()->input('dtms_visitid') ?? Session::get('dtms_visitid'))]);
 $visitdate = getAfeild("visit_date", "patient_visits", $cond);
 $data['visit_date'] = $visitdate;
 
@@ -4284,9 +4284,9 @@ return $pdf->stream('filename.pdf');
             $insert_id = "";
             $targetData = [];
             $targetData = [
-                'patient_id' => Session::get('dtms_pid'),
+                'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 'test_id' => $request->get('search_test_name'),
-                'visit_id' => Session::get('dtms_visitid'),
+                'visit_id' => (request()->input('dtms_visitid') ?? Session::get('dtms_visitid')),
                 'target_value' => $request->get('target_value'),
                 'present_value' => $request->get('present_value'),
                 'created_at' => Carbon::now(),
@@ -4321,8 +4321,8 @@ return $pdf->stream('filename.pdf');
             // END OF LOG
             if ($insert_id) 
             {
-                $targetMainArray = $this->getvisitbasedTarget(Session::get('dtms_visitid'));
-                $patientTargetDetails = PatientTargetDetail::where('visit_id', Session::get('dtms_visitid'))->first();
+                $targetMainArray = $this->getvisitbasedTarget((request()->input('dtms_visitid') ?? Session::get('dtms_visitid')));
+                $patientTargetDetails = PatientTargetDetail::where('visit_id', (request()->input('dtms_visitid') ?? Session::get('dtms_visitid')))->first();
                 $patientTargetData = [
                     'weight_target' => isset($patientTargetDetails->weight_target) ? $patientTargetDetails->weight_target : '',
                     'weight_present'  => isset($patientTargetDetails->weight_present) ? $patientTargetDetails->weight_present : '',
@@ -4365,7 +4365,7 @@ return $pdf->stream('filename.pdf');
     public function getDietHistoryAnswerSheetData()
     {
         $cond = array();
-        array_push($cond, ['patient_answer_sheet.patient_id', Session::get('dtms_pid')]);
+        array_push($cond, ['patient_answer_sheet.patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid'))]);
         array_push($cond, ['patient_answer_sheet.question_type_id', 1]);
         $filldata = PatientAnswerSheet::select('patient_answer_sheet.*', 'question_types.type_name')
             ->join('question_types', 'question_types.id', '=', 'patient_answer_sheet.question_type_id')
@@ -4432,7 +4432,7 @@ return $pdf->stream('filename.pdf');
     public function getPepAnswerSheetData()
     {
         $cond = array();
-        array_push($cond, ['patient_answer_sheet.patient_id', Session::get('dtms_pid')]);
+        array_push($cond, ['patient_answer_sheet.patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid'))]);
         array_push($cond, ['patient_answer_sheet.question_type_id', 2]);
         $filldata = PatientAnswerSheet::select('patient_answer_sheet.*', 'question_types.type_name')
             ->join('question_types', 'question_types.id', '=', 'patient_answer_sheet.question_type_id')
@@ -4500,7 +4500,7 @@ return $pdf->stream('filename.pdf');
     public function getMiscellaneousData()
     {
         $cond = array();
-        array_push($cond, ['patient_answer_sheet.patient_id', Session::get('dtms_pid')]);
+        array_push($cond, ['patient_answer_sheet.patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid'))]);
         array_push($cond, ['patient_answer_sheet.question_type_id', 3]);
         $filldata = PatientAnswerSheet::select('patient_answer_sheet.*', 'question_types.type_name')
             ->join('question_types', 'question_types.id', '=', 'patient_answer_sheet.question_type_id')
@@ -4577,10 +4577,10 @@ return $pdf->stream('filename.pdf');
 
             $questionid = $value->id;
             $data_list = '';
-            $patientAnswerSheet = PatientAnswerSheet::where('patient_id', Session::get('dtms_pid'))->orderByDesc('id')->first();
+            $patientAnswerSheet = PatientAnswerSheet::where('patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))->orderByDesc('id')->first();
             if (!is_null($patientAnswerSheet)) {
                 $answersArray = FormEngineAnswers::where('question_id', $questionid)
-                    ->where('patient_id', Session::get('dtms_pid'))
+                    ->where('patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))
                     ->where('answer_sheet_id', $patientAnswerSheet->id)
                     ->orderByDesc('id')
                     ->first();
@@ -4788,7 +4788,7 @@ return $pdf->stream('filename.pdf');
             'specialist_master.specialist_name'
         )
             ->leftjoin('specialist_master', 'specialist_master.id', '=', 'patient_registration.specialist_id')
-            ->where('patient_registration.id', Session::get('dtms_pid'))
+            ->where('patient_registration.id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))
             ->first();
         $dietHistory =  OldTeleMedicineAnswerSheet::select(
             'old_tele_medicine_answersheets.student_id',
@@ -4797,7 +4797,7 @@ return $pdf->stream('filename.pdf');
             'old_tele_medicine_questions.question'
         )
             ->leftjoin('old_tele_medicine_questions', 'old_tele_medicine_questions.id', '=', 'old_tele_medicine_answersheets.questions_id')
-            ->where('old_tele_medicine_answersheets.student_id', Session::get('dtms_pid'))
+            ->where('old_tele_medicine_answersheets.student_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))
             ->where('old_tele_medicine_questions.paper_nameid', 2)
             ->get();
         $patientDate = Carbon::parse($patientData->created_at)->format('d-m-Y');
@@ -4831,7 +4831,7 @@ return $pdf->stream('filename.pdf');
             'specialist_master.specialist_name'
         )
             ->leftjoin('specialist_master', 'specialist_master.id', '=', 'patient_registration.specialist_id')
-            ->where('patient_registration.id', Session::get('dtms_pid'))
+            ->where('patient_registration.id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))
             ->first();
         $pepHistory =  OldTeleMedicineAnswerSheet::select(
             'old_tele_medicine_answersheets.student_id',
@@ -4840,7 +4840,7 @@ return $pdf->stream('filename.pdf');
             'old_tele_medicine_questions.question'
         )
             ->leftjoin('old_tele_medicine_questions', 'old_tele_medicine_questions.id', '=', 'old_tele_medicine_answersheets.questions_id')
-            ->where('old_tele_medicine_answersheets.student_id', Session::get('dtms_pid'))
+            ->where('old_tele_medicine_answersheets.student_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))
             ->where('old_tele_medicine_questions.paper_nameid', 1)
             ->get();
         $patientDate = Carbon::parse($patientData->created_at)->format('d-m-Y');
@@ -4922,13 +4922,13 @@ return $pdf->stream('filename.pdf');
             'specialist_master.specialist_name'
         )
             ->leftjoin('specialist_master', 'specialist_master.id', '=', 'patient_registration.specialist_id')
-            ->where('patient_registration.id', Session::get('dtms_pid'))
+            ->where('patient_registration.id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))
             ->first();
 
         $vitals = PatientVitals::select('patient_vitals.id', 'patient_vitals.vitals_value', 'vitals_master.vital_name', 'vitals_master.unit_name', 'patient_vitals.created_at', 'vitals_master.id as vital_id')
             ->leftjoin('vitals_master', 'vitals_master.id', '=', 'patient_vitals.vitals_id')
-            ->where('patient_vitals.visit_id', Session::get('dtms_visitid'))
-            ->where('patient_vitals.patient_id', Session::get('dtms_pid'))
+            ->where('patient_vitals.visit_id', (request()->input('dtms_visitid') ?? Session::get('dtms_visitid')))
+            ->where('patient_vitals.patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))
             ->orderBy('vitals_master.order', 'ASC')
             ->get();
 
@@ -4943,7 +4943,7 @@ return $pdf->stream('filename.pdf');
 
 
         $cond = [];
-        array_push($cond, ['id', Session::get('dtms_visitid')]);
+        array_push($cond, ['id', (request()->input('dtms_visitid') ?? Session::get('dtms_visitid'))]);
         $specialist_id = getAfeild("specialist_id", "patient_visits", $cond);
         if ($specialist_id > 0) {
             $cond = [];
@@ -5034,7 +5034,7 @@ return $pdf->stream('filename.pdf');
         if ($validated) {
 
             $cond = array(
-                array('id', Session::get('dtms_visitid')),
+                array('id', (request()->input('dtms_visitid') ?? Session::get('dtms_visitid'))),
             );
 
             $test_date = getAfeild("visit_date", "patient_visits", $cond);
@@ -5042,9 +5042,9 @@ return $pdf->stream('filename.pdf');
             $ins_data = array(
                 'TestId' => $request->search_test,
                 'ResultValue' => $request->result,
-                'PatientId' => Session::get('dtms_pid'),
+                'PatientId' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 'is_outside_lab' => 1,
-                'visit_id' => Session::get('dtms_visitid'),
+                'visit_id' => (request()->input('dtms_visitid') ?? Session::get('dtms_visitid')),
                 'created_at' => $test_date,
                 'updated_at' => Carbon::now(),
                 'created_by' => Auth::id(),
@@ -5052,10 +5052,10 @@ return $pdf->stream('filename.pdf');
             );
 
             $cond = [];
-            array_push($cond, ['visit_id', Session::get('dtms_visitid')]);
+            array_push($cond, ['visit_id', (request()->input('dtms_visitid') ?? Session::get('dtms_visitid'))]);
             array_push($cond, ['TestId', $request->search_test]);
             array_push($cond, ['is_outside_lab', 1]);
-            array_push($cond, ['PatientId', Session::get('dtms_pid')]);
+            array_push($cond, ['PatientId', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid'))]);
 
             $value = getAfeild("id", "test_results", $cond);
             if ($value) {
@@ -5112,8 +5112,8 @@ return $pdf->stream('filename.pdf');
     public function getOutsideLabData()
     {
         $cond = array();
-        array_push($cond, ['test_results.PatientId', Session::get('dtms_pid')]);
-        array_push($cond, ['patient_visits.id', Session::get('dtms_visitid')]);
+        array_push($cond, ['test_results.PatientId', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid'))]);
+        array_push($cond, ['patient_visits.id', (request()->input('dtms_visitid') ?? Session::get('dtms_visitid'))]);
         array_push($cond, ['test_results.is_outside_lab', 1]);
         $filldata = TestResults::select('test_results.TestId', 'test_results.ResultValue', 'test_master.TestName')
             ->leftjoin('test_master', 'test_master.TestId', '=', 'test_results.TestId')
@@ -5206,7 +5206,7 @@ return $pdf->stream('filename.pdf');
 
         if ($validated) {
             $cond = array(
-                array('id', Session::get('dtms_visitid')),
+                array('id', (request()->input('dtms_visitid') ?? Session::get('dtms_visitid'))),
             );
 
             $test_date = getAfeild("visit_date", "patient_visits", $cond);
@@ -5214,9 +5214,9 @@ return $pdf->stream('filename.pdf');
             $ins_data = array(
                 'TestId' => $request->search_test_names_smbg,
                 'ResultValue' => $request->result_value,
-                'PatientId' => Session::get('dtms_pid'),
+                'PatientId' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 'is_smbg' => 1,
-                'visit_id' => Session::get('dtms_visitid'),
+                'visit_id' => (request()->input('dtms_visitid') ?? Session::get('dtms_visitid')),
                 'created_at' => $test_date,
                 'updated_at' => Carbon::now(),
                 'created_by' => Auth::id(),
@@ -5270,8 +5270,8 @@ return $pdf->stream('filename.pdf');
     public function getSmbgLabData()
     {
         $cond = array();
-        array_push($cond, ['test_results.PatientId', Session::get('dtms_pid')]);
-        array_push($cond, ['patient_visits.id', Session::get('dtms_visitid')]);
+        array_push($cond, ['test_results.PatientId', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid'))]);
+        array_push($cond, ['patient_visits.id', (request()->input('dtms_visitid') ?? Session::get('dtms_visitid'))]);
         array_push($cond, ['test_results.is_smbg', 1]);
         //        array_push($cond,['test_results.is_manual_entry',1]);
         $filldata = TestResults::select('test_results.TestId', 'test_results.ResultValue', 'test_master.TestName')
@@ -5302,7 +5302,7 @@ return $pdf->stream('filename.pdf');
         if ($validated) {
 
             $cond = array(
-                array('id', Session::get('dtms_visitid')),
+                array('id', (request()->input('dtms_visitid') ?? Session::get('dtms_visitid'))),
             );
 
             $test_date = getAfeild("visit_date", "patient_visits", $cond);
@@ -5310,10 +5310,10 @@ return $pdf->stream('filename.pdf');
             $ins_data = array(
                 'TestId' => $request->search_test_names,
                 'ResultValue' => $request->result_value,
-                'PatientId' => Session::get('dtms_pid'),
+                'PatientId' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
                 'is_outside_lab' => 0,
                 'is_manual_entry' => 1,
-                'visit_id' => Session::get('dtms_visitid'),
+                'visit_id' => (request()->input('dtms_visitid') ?? Session::get('dtms_visitid')),
                 'created_at' => $test_date,
                 'updated_at' => Carbon::now(),
                 'created_by' => Auth::id(),
@@ -5321,8 +5321,8 @@ return $pdf->stream('filename.pdf');
             );
 
             $cond = [];
-            array_push($cond, ['visit_id', Session::get('dtms_visitid')]);
-            array_push($cond, ['PatientId', Session::get('dtms_pid')]);
+            array_push($cond, ['visit_id', (request()->input('dtms_visitid') ?? Session::get('dtms_visitid'))]);
+            array_push($cond, ['PatientId', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid'))]);
             array_push($cond, ['TestId', $request->search_test]);
             array_push($cond, ['is_outside_lab', 0]);
 
@@ -5381,8 +5381,8 @@ return $pdf->stream('filename.pdf');
     public function getInsideLabData()
     {
         $cond = array();
-        array_push($cond, ['test_results.PatientId', Session::get('dtms_pid')]);
-        array_push($cond, ['patient_visits.id', Session::get('dtms_visitid')]);
+        array_push($cond, ['test_results.PatientId', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid'))]);
+        array_push($cond, ['patient_visits.id', (request()->input('dtms_visitid') ?? Session::get('dtms_visitid'))]);
         array_push($cond, ['test_results.is_outside_lab', 0]);
         array_push($cond, ['test_results.is_smbg', 0]);
         //        array_push($cond,['test_results.is_manual_entry',1]);
@@ -5429,7 +5429,7 @@ return $pdf->stream('filename.pdf');
                 'qury_log' => $sql,
                 'description' => 'DTMS, Delete Patient Prescriptions Data',
                 'created_date' => date('Y-m-d H:i:s'),
-                'patient_id' => Session::get('dtms_pid'),
+                'patient_id' => (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')),
             );
 
             $save_history = $this->HistoryController->saveHistory($log);

@@ -203,6 +203,8 @@
 
 
             <input type="hidden" name="hid_visit_patient_id" id="hid_visit_patient_id" value="{{$patient_get_id}}">
+            <input type="hidden" id="current_dtms_patient_id" value="{{ ! is_null($patient_data) ? $patient_data->id : '' }}">
+            <input type="hidden" id="current_dtms_visit_id" value="">
 
 
             {{-- @include('includes/dtms_profile_sidebar',['data'=>$patient_data]) --}}
@@ -894,6 +896,39 @@
 <!-- <script src="{{asset('./js/plugins-init/select2-init.js')}}"></script> -->
 
 <script>
+    $.ajaxPrefilter(function(options, originalOptions, jqXHR) {
+        var patientId = $('#current_dtms_patient_id').val();
+        var visitId = $('#current_dtms_visit_id').val();
+
+        if (options.data instanceof FormData) {
+            if (patientId && !options.data.has('dtms_patient_id')) {
+                options.data.append('dtms_patient_id', patientId);
+            }
+            if (visitId && !options.data.has('dtms_visitid')) {
+                options.data.append('dtms_visitid', visitId);
+            }
+        } else if (typeof options.data === 'string') {
+            if (patientId && options.data.indexOf('dtms_patient_id=') === -1) {
+                options.data += (options.data.length > 0 ? '&' : '') + 'dtms_patient_id=' + encodeURIComponent(patientId);
+            }
+            if (visitId && options.data.indexOf('dtms_visitid=') === -1) {
+                options.data += (options.data.length > 0 ? '&' : '') + 'dtms_visitid=' + encodeURIComponent(visitId);
+            }
+        } else if (typeof options.data === 'object' && options.data !== null && $.isPlainObject(options.data)) {
+            if (patientId && options.data.dtms_patient_id === undefined) {
+                options.data.dtms_patient_id = patientId;
+            }
+            if (visitId && options.data.dtms_visitid === undefined) {
+                options.data.dtms_visitid = visitId;
+            }
+        } else if (!options.data && options.type && options.type.toUpperCase() !== 'GET') {
+            var params = [];
+            if (patientId) params.push('dtms_patient_id=' + encodeURIComponent(patientId));
+            if (visitId) params.push('dtms_visitid=' + encodeURIComponent(visitId));
+            if (params.length > 0) options.data = params.join('&');
+        }
+    });
+
     function  gotograph(patientId) {
         window.open('{{url("view-all-test-results")}}/' + patientId ,'_blank' );
 
@@ -1711,7 +1746,7 @@
     // $('#visit_history tbody').on('click','tr',function() {
 
     function getVistData(id){
-        localStorage.setItem("dtms_visitId", id);
+        $('#current_dtms_visit_id').val(id);
 
         $(this).addClass("active");
         // var id = $(this).attr('id');
@@ -1870,7 +1905,7 @@
 <script>
 
 $(document).ready(function(){
-    localStorage.removeItem("dtms_visitId");
+    $('#current_dtms_visit_id').val('');
 
 });
     function saveAllDtmsData(crude=1)
@@ -1929,7 +1964,7 @@ $(document).ready(function(){
                     swal("Done", result.message, "success");
                     medicine = [];
 
-                    var visitId = localStorage.getItem("dtms_visitId");
+                    var visitId = $('#current_dtms_visit_id').val();
 
                    // getVistData(visitId);
                 } else if (result.status == 2) {
@@ -2204,7 +2239,7 @@ $(document).ready(function(){
     function viewAllTest()
     {
         $("#test_result_by_id").html('loading...');
-        var visitId = localStorage.getItem("dtms_visitId");
+        var visitId = $('#current_dtms_visit_id').val();
         if(visitId>0)
         {
             $.ajax({

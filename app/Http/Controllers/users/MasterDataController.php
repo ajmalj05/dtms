@@ -5831,10 +5831,10 @@ class MasterDataController extends Controller
             // $checkOptionsExists=$this->get_OptionsByTYpeId($value->type_id,$value->id);  // typeId & QuestionId
             $questionid = $value->id;
             $data_list = '';
-            $patientAnswerSheet = PatientAnswerSheet::where('patient_id', Session::get('dtms_pid'))->orderByDesc('id')->first();
+            $patientAnswerSheet = PatientAnswerSheet::where('patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))->orderByDesc('id')->first();
             if (!is_null($patientAnswerSheet)) {
                 $answersArray = FormEngineAnswers::where('question_id', $questionid)
-                    ->where('patient_id', Session::get('dtms_pid'))
+                    ->where('patient_id', (request()->input('dtms_patient_id') ?? Session::get('dtms_pid')))
                     ->where('answer_sheet_id', $patientAnswerSheet->id)
                     ->orderByDesc('id')
                     ->first();
