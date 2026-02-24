@@ -135,7 +135,7 @@ class AiChatController extends Controller
     private function streamAI(string $systemPrompt, string $userMessage, ?string $cachedContentName = null)
     {
         $provider = config('services.ai.provider', 'gemini');
-        $model = 'gemini-1.5-flash'; // High-speed model for chat
+        $model = 'gemini-2.5-flash'; // High-speed model for chat
         $apiKey = ($provider === 'gemini') ? config('services.gemini.api_key') : (config('services.ai.api_key') ?? config('services.gemini.api_key'));
 
         if (!$apiKey) {
@@ -779,7 +779,7 @@ class AiChatController extends Controller
         $provider = $providerOverride ?? config('services.ai.provider', 'gemini');
         $apiKey = ($provider === 'gemini') ? config('services.gemini.api_key') : (config('services.ai.api_key') ?? config('services.gemini.api_key'));
         // Enforce Pro model for analysis tasks to guarantee accuracy and JSON structure adherence
-        $model = ($provider === 'gemini') ? 'gemini-1.5-pro' : (config('services.ai.model') ?? config('services.gemini.model'));
+        $model = ($provider === 'gemini') ? 'gemini-2.5-pro' : (config('services.ai.model') ?? config('services.gemini.model'));
         $baseUrl = config('services.ai.base_url');
 
         if (!$apiKey || !$model) {
