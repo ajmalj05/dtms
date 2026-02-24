@@ -104,23 +104,16 @@ class AiChatController extends Controller
             // 7. Get or Create Cache (Performance Optimization)
             $cachedContentName = $this->getOrCreateGeminiCache($patientId, $systemPrompt);
 
-            // 8. Call AI API
-            $response = $this->callAI($systemPrompt, $userMessage, [], 'gemini', $cachedContentName);
-
-            if ($response['status'] === 'error') {
-                return response()->json($response, 500);
-            }
-
-            // 9. Log response
-            Log::channel('daily')->info('AI Chat Response', [
-                'user_id' => $userId,
-                'response_length' => strlen($response['response'])
-            ]);
-
-            return response()->json([
-                'status' => 'success',
-                'response' => $response['response'],
-                'usage' => $response['usage'] ?? []
+            // 8. Stream AI Response using SSE
+            return response()->stream(function () use ($systemPrompt, $userMessage, $cachedContentName) {
+                if (ob_get_level() > 0) {
+                    ob_end_clean();
+                }
+                $this->streamAI($systemPrompt, $userMessage, $cachedContentName);
+            }, 200, [
+                'Cache-Control' => 'no-cache',
+                'Content-Type' => 'text/event-stream',
+                'X-Accel-Buffering' => 'no',
             ]);
 
         } catch (\Exception $e) {
@@ -132,8 +125,94 @@ class AiChatController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Error: ' . $e->getMessage() . ' on line ' . $e->getLine()
-            ], 500);
+             ], 500);
         }
+    }
+
+    /**
+     * Stream chunked response to frontend via Server-Sent Events.
+     */
+    private function streamAI(string $systemPrompt, string $userMessage, ?string $cachedContentName = null)
+    {
+        $provider = config('services.ai.provider', 'gemini');
+        $model = 'gemini-1.5-flash'; // High-speed model for chat
+        $apiKey = ($provider === 'gemini') ? config('services.gemini.api_key') : (config('services.ai.api_key') ?? config('services.gemini.api_key'));
+
+        if (!$apiKey) {
+            echo "data: " . json_encode(['error' => 'API key missing']) . "\n\n";
+            return;
+        }
+
+        $geminiBaseUrl = config('services.gemini.base_url', 'https://generativelanguage.googleapis.com/v1beta/models/');
+        $url = $geminiBaseUrl . "{$model}:streamGenerateContent?alt=sse&key=" . $apiKey;
+
+        $generationConfig = [
+            'temperature' => 0.3,
+            'topK' => 40,
+            'topP' => 0.95,
+            'maxOutputTokens' => 8192,
+        ];
+
+        $payload = [
+            'contents' => [
+                [
+                    'role' => 'user',
+                    'parts' => [
+                        ['text' => ($cachedContentName ? $userMessage : ($systemPrompt . "\n\nUser Question: " . $userMessage))]
+                    ]
+                ]
+            ],
+            'generationConfig' => $generationConfig,
+        ];
+
+        if ($cachedContentName) {
+            $payload['cachedContent'] = $cachedContentName;
+        } else {
+            $payload['systemInstruction'] = [
+                'parts' => [['text' => $systemPrompt]]
+            ];
+            $payload['safetySettings'] = [
+                ['category' => 'HARM_CATEGORY_HARASSMENT', 'threshold' => 'BLOCK_MEDIUM_AND_ABOVE'],
+                ['category' => 'HARM_CATEGORY_HATE_SPEECH', 'threshold' => 'BLOCK_MEDIUM_AND_ABOVE'],
+                ['category' => 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'threshold' => 'BLOCK_MEDIUM_AND_ABOVE'],
+                ['category' => 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold' => 'BLOCK_MEDIUM_AND_ABOVE']
+            ];
+        }
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, false); 
+        curl_setopt($ch, CURLOPT_WRITEFUNCTION, function($curl, $data) {
+            $lines = explode("\n", $data);
+            foreach ($lines as $line) {
+                if (str_starts_with($line, 'data: ')) {
+                    $jsonStr = trim(substr($line, 6));
+                    if ($jsonStr && $jsonStr !== '[DONE]') {
+                        $decoded = json_decode($jsonStr, true);
+                        if (isset($decoded['candidates'][0]['content']['parts'][0]['text'])) {
+                            $text = $decoded['candidates'][0]['content']['parts'][0]['text'];
+                            echo "data: " . json_encode(['text' => $text]) . "\n\n";
+                            if (ob_get_level() > 0) { ob_flush(); }
+                            flush();
+                        }
+                    }
+                }
+            }
+            return strlen($data);
+        });
+
+        curl_exec($ch);
+        if(curl_errno($ch)) {
+            echo "data: " . json_encode(['error' => curl_error($ch)]) . "\n\n";
+        }
+        curl_close($ch);
+        
+        echo "data: [DONE]\n\n";
+        if (ob_get_level() > 0) { ob_flush(); }
+        flush();
     }
 
     /**
@@ -177,99 +256,67 @@ class AiChatController extends Controller
             // Build Summary Prompt
             $systemPrompt = $this->buildSystemPrompt($context);
             $analysisPrompt = "Analyze the COMPLETE patient data for a Specialized Diabetes Hospital.\n";
-            $analysisPrompt .= "REQUIRED JSON STRUCTURE:\n";
-            $analysisPrompt .= "{\n";
-            $analysisPrompt .= "  \"overview\": \"EXECUTIVE SUMMARY (2 Sentences). Identity (Age/Gender/Key Conditions) + Current Clinical Trajectory (Stable/Worsening/Improving). Example: '71yr Female with long-standing T2DM and Class III Obesity. Current presentation suggests worsening renal function and suboptimal glycemic control requiring intervention.',\",\n";
-            $analysisPrompt .= "  \"summary\": \"PATIENT CONTEXT (The Clinical Background). Create 3 distinct bullet points covering: 1) **Disease Burden:** Primary diagnoses and duration (if known). 2) **Comorbidities:** Key active associated conditions (HTN, Dyslipidemia, etc). 3) **Care Pattern:** Recent engagement (regular vs irregular visits) and current therapy class (Insulin/OADs). Use '• ' for bullets.\",\n";
-            $analysisPrompt .= "  \"flags\": [\"ACTIONABLE ALERTS & VARIATIONS (The Action). Highlight ONLY things that are WRONG or CHANGING. MUST Flag: 1) Dangerous Trends (e.g., Creatinine rose from X to Y), 2) Out-of-range Labs (Creatinine > 1.2, HbA1c > 7), 3) Missing Screenings (Foot/Eye exam overdue > 12 months), 4) Critical Variations in metabolic control.\"],\n";
-            $analysisPrompt .= "  \"conclusion\": \"CONSULTANT DIRECTIVE. Provide a structured verdict.\\nStart with '<b>Assessment:</b>' [Explain the clinical status].\\nThen add '<br><b>Plan:</b>' [Specific next steps/referrals].\"\n";
-            $analysisPrompt .= "}\n";
             $analysisPrompt .= "RULES: \n";
             $analysisPrompt .= "1. NO REDUNDANCY: Do not repeat facts from the Summary in the Flags section unless it is to highlight a dangerous change.\n";
             $analysisPrompt .= "2. BE AGGRESSIVE: If labs are abnormal (like Creatinine 3.8), this is a major flag, not just a summary point.\n";
             $analysisPrompt .= "3. NO Generic flags: Avoid 'Regular follow-up'. Find actual clinical gaps.\n";
             $analysisPrompt .= "4. Base clinical analysis on LONG-TERM trends provided in the full context.\n";
             $analysisPrompt .= "5. CONCLUSION must be authoritative and actionable.\n";
+            $analysisPrompt .= "6. STRICT COMPLIANCE: Use ONLY the explicit data provided. Do NOT hallucinate, guess, or assume any medical conditions, treatments, or missing data points.\n";
+
+            $responseSchema = [
+                'type' => 'OBJECT',
+                'properties' => [
+                    'overview' => [
+                        'type' => 'STRING',
+                        'description' => "EXECUTIVE SUMMARY (2 Sentences). Identity (Age/Gender/Key Conditions) + Current Clinical Trajectory (Stable/Worsening/Improving). Example: '71yr Female with long-standing T2DM and Class III Obesity. Current presentation suggests worsening renal function and suboptimal glycemic control requiring intervention.',"
+                    ],
+                    'summary' => [
+                        'type' => 'STRING',
+                        'description' => "PATIENT CONTEXT (The Clinical Background). Create 3 distinct bullet points covering: 1) **Disease Burden:** Primary diagnoses and duration (if known). 2) **Comorbidities:** Key active associated conditions (HTN, Dyslipidemia, etc). 3) **Care Pattern:** Recent engagement (regular vs irregular visits) and current therapy class (Insulin/OADs). Use '• ' for bullets."
+                    ],
+                    'flags' => [
+                        'type' => 'ARRAY',
+                        'items' => ['type' => 'STRING'],
+                        'description' => "ACTIONABLE ALERTS & VARIATIONS (The Action). Highlight ONLY things that are WRONG or CHANGING. MUST Flag: 1) Dangerous Trends (e.g., Creatinine rose from X to Y), 2) Out-of-range Labs (Creatinine > 1.2, HbA1c > 7), 3) Missing Screenings (Foot/Eye exam overdue > 12 months), 4) Critical Variations in metabolic control."
+                    ],
+                    'conclusion' => [
+                        'type' => 'STRING',
+                        'description' => "CONSULTANT DIRECTIVE. Provide a structured verdict. Start with '<b>Assessment:</b>' [Explain the clinical status]. Then add '<br><b>Plan:</b>' [Specific next steps/referrals]."
+                    ]
+                ],
+                'required' => ['overview', 'summary', 'flags', 'conclusion']
+            ];
 
             // EXPERIMENTAL: Implementation of "Cached Input" via Gemini Context Caching
             $cachedContentName = $this->getOrCreateGeminiCache($patientId, $systemPrompt);
 
-            // Call API with JSON enforcement - Using Gemini for Summaries as requested
-            $response = $this->callAI($systemPrompt, $analysisPrompt, ['responseMimeType' => 'application/json'], 'gemini', $cachedContentName);
+            // Call API with JSON enforcement - Using Gemini Structured Outputs
+            $response = $this->callAI($systemPrompt, $analysisPrompt, [
+                'responseMimeType' => 'application/json',
+                'responseSchema' => $responseSchema
+            ], 'gemini', $cachedContentName);
             
             if ($response['status'] === 'error') {
                 return response()->json($response, 500);
             }
             
-            // Clean response to ensure valid JSON
-            $responseText = trim($response['response']);
-
-            // 1. Remove markdown code blocks
-            $responseText = preg_replace('/^```(?:json)?|```$/m', '', $responseText);
-            $responseText = trim($responseText);
-
-            // 2. SANITIZATION: Handle literal newlines inside JSON strings
-            // This is the most common cause of "Control character error"
-            $cleanedResponse = preg_replace_callback('/"([^"\\\\]*(?:\\\\.[^"\\\\]*)*)"/s', function($matches) {
-                return '"' . str_replace(["\n", "\r", "\t"], ["\\n", "\\r", "\\t"], $matches[1]) . '"';
-            }, $responseText);
-            
-            $jsonObj = json_decode($cleanedResponse, true);
+            $jsonObj = json_decode($response['response'], true);
 
             if (json_last_error() !== JSON_ERROR_NONE) {
-                Log::warning('AI Analysis JSON Decode Failed', [
+                Log::warning('AI Analysis JSON Decode Failed (Structured Output Fallback)', [
                     'error' => json_last_error_msg(),
-                    'raw_response' => $responseText
+                    'raw_response' => $response['response']
                 ]);
-
-                // Fallback: Ultra-robust manual field extraction
-                $overview = 'N/A';
-                $summary = 'N/A';
-                $flags = [];
-
-                // 1. Extract Overview (Simple)
-                if (preg_match('/"overview"\s*:\s*"([\s\S]*?)"(?=\s*[,}\r\n])/i', $responseText, $ovMatches)) {
-                    $overview = trim($ovMatches[1]);
-                }
                 
-                // 2. Extract Summary (Aggressive)
-                // First try to find it with a clear boundary
-                if (preg_match('/"summary"\s*:\s*"([\s\S]*?)"(?=\s*[,}\r\n])/i', $responseText, $sumMatches)) {
-                    $summary = trim($sumMatches[1]);
-                } 
-                // If that fails, try to just grab everything after "summary": " until the end of the JSON or string
-                elseif (preg_match('/"summary"\s*:\s*"([\s\S]*?)$/', $responseText, $sumMatches)) {
-                    $summary = rtrim(trim($sumMatches[1]), '"} ');
-                }
-
-                // 3. Extract Flags (Improved regex for quotes and bracket styles)
-                if (preg_match('/"flags"\s*:\s*\[([\s\S]*?)\]/i', $responseText, $flagMatches)) {
-                    $flagsStr = $flagMatches[1];
-                    preg_match_all('/["\']([^"\']+)["\']/', $flagsStr, $individualFlagMatches);
-                    $flags = $individualFlagMatches[1] ?? [];
-                }
-
-                // 4. Extract Conclusion
-                $conclusion = 'N/A';
-                if (preg_match('/"conclusion"\s*:\s*"([\s\S]*?)"(?=\s*[,}\r\n])/i', $responseText, $concMatches)) {
-                    $conclusion = trim($concMatches[1]);
-                } elseif (preg_match('/"conclusion"\s*:\s*"([\s\S]*?)$/', $responseText, $concMatches)) {
-                    $conclusion = rtrim(trim($concMatches[1]), '"} ');
-                }
-                
-                if (empty($flags)) {
-                    Log::notice('AI Analysis - No flags found in response', ['raw' => $responseText]);
-                }
-
                 $finalData = [
-                    'overview' => str_replace(['\\n', '\\"'], ["\n", '"'], $overview),
-                    'summary' => str_replace(['\\n', '\\"'], ["\n", '"'], $summary),
-                    'flags' => $flags,
-                    'conclusion' => str_replace(['\\n', '\\"'], ["\n", '"'], $conclusion),
-                    'is_error' => ($overview === 'N/A' && $summary === 'N/A') // Only error if BOTH failed
+                    'overview' => 'N/A',
+                    'summary' => 'N/A',
+                    'flags' => [],
+                    'conclusion' => 'Analysis failed. Please try again.',
+                    'is_error' => true
                 ];
             } else {
-                // Ensure all keys exist and clean up any escaped strings
                 $finalData = [
                     'overview' => trim($jsonObj['overview'] ?? 'N/A'),
                     'summary' => trim($jsonObj['summary'] ?? 'N/A'),
@@ -340,158 +387,164 @@ class AiChatController extends Controller
      */
     private function getPatientContext(int $patientId, string $intent = self::INTENT_FULL): ?array
     {
-        // Basic patient information
-        $patient = PatientRegistration::select(
-            'patient_registration.*',
-            'patient_type_master.patient_type_name',
-            'salutation_master.salutation_name'
-        )
-            ->leftJoin('patient_type_master', 'patient_type_master.id', '=', 'patient_registration.patient_type')
-            ->leftJoin('salutation_master', 'salutation_master.id', '=', 'patient_registration.salutation_id')
-            ->where('patient_registration.id', $patientId)
-            ->first();
-
-        if (!$patient) {
-            return null;
-        }
-
-        // Calculate age
-        $age = null;
-        if ($patient->dob) {
-            $age = \Carbon\Carbon::parse($patient->dob)->age;
-        }
-
-        // Get gender
-        $gender = 'Unknown';
-        if ($patient->gender) {
-            if (str_contains(strtolower($patient->gender), 'm')) $gender = 'Male';
-            elseif (str_contains(strtolower($patient->gender), 'f')) $gender = 'Female';
-            else $gender = 'Other';
-        }
-
-        // Diagnoses (Fixed table names)
-        $diagnoses = PatientDiagnosis::select(
-            'patient_diagnosis.*',
-            'diagnosis_master.diagnosis_name',
-            'subdiagnosis_master.subdiagnosis_name'
-        )
-            ->leftJoin('diagnosis_master', 'diagnosis_master.id', '=', 'patient_diagnosis.diagnosis_id')
-            ->leftJoin('subdiagnosis_master', 'subdiagnosis_master.id', '=', 'patient_diagnosis.sub_diagnosis_id')
-            ->where('patient_diagnosis.patient_id', $patientId)
-            ->get();
-
-        // Complications 
-        $complications = PatientComplication::select(
-            'patient_complication.*',
-            'complication_master.complication_name',
-            'subcomplication_master.subcomplication_name'
-        )
-            ->leftJoin('complication_master', 'complication_master.id', '=', 'patient_complication.complication_id')
-            ->leftJoin('subcomplication_master', 'subcomplication_master.id', '=', 'patient_complication.sub_complication_id')
-            ->where('patient_complication.patient_id', $patientId)
-            ->get();
-
-        // Filter: Vitals
-        $vitals = collect([]);
-        if ($intent === self::INTENT_FULL || $intent === self::INTENT_VITALS) {
-            $vitals = PatientVitals::select(
-                'patient_vitals.*',
-                'vitals_master.vital_name'
+        $cacheKey = "dtms_ai_context_{$patientId}_{$intent}";
+        
+        return Cache::remember($cacheKey, 300, function () use ($patientId, $intent) {
+            // Basic patient information
+            $patient = PatientRegistration::select(
+                'patient_registration.*',
+                'patient_type_master.patient_type_name',
+                'salutation_master.salutation_name'
             )
-                ->leftJoin('vitals_master', 'vitals_master.id', '=', 'patient_vitals.vitals_id')
-                ->where('patient_vitals.patient_id', $patientId)
-                ->orderBy('patient_vitals.created_at', 'desc')
-                ->get()
-                ->unique('vitals_id');
-        }
+                ->leftJoin('patient_type_master', 'patient_type_master.id', '=', 'patient_registration.patient_type')
+                ->leftJoin('salutation_master', 'salutation_master.id', '=', 'patient_registration.salutation_id')
+                ->where('patient_registration.id', $patientId)
+                ->first();
 
-        // Filter: Prescriptions
-        $prescriptions = collect([]);
-        if ($intent === self::INTENT_FULL || $intent === self::INTENT_MEDS) {
-            $prescriptions = PatientPrescriptions::select(
-                'patient_prescriptions.*',
-                'medicine_master.medicine_name',
-                'tablet_type_master.tablet_type_name'
+            if (!$patient) {
+                return null;
+            }
+
+            // Calculate age
+            $age = null;
+            if ($patient->dob) {
+                $age = \Carbon\Carbon::parse($patient->dob)->age;
+            }
+
+            // Get gender
+            $gender = 'Unknown';
+            if ($patient->gender) {
+                if (str_contains(strtolower($patient->gender), 'm')) $gender = 'Male';
+                elseif (str_contains(strtolower($patient->gender), 'f')) $gender = 'Female';
+                else $gender = 'Other';
+            }
+
+            // Diagnoses (Fixed table names)
+            $diagnoses = PatientDiagnosis::select(
+                'patient_diagnosis.*',
+                'diagnosis_master.diagnosis_name',
+                'subdiagnosis_master.subdiagnosis_name'
             )
-                ->leftJoin('medicine_master', 'medicine_master.id', '=', 'patient_prescriptions.medicine_id')
-                ->leftJoin('tablet_type_master', 'tablet_type_master.id', '=', 'patient_prescriptions.tablet_type_id')
-                ->where('patient_prescriptions.patient_id', $patientId)
-                ->orderBy('patient_prescriptions.created_at', 'desc')
+                ->leftJoin('diagnosis_master', 'diagnosis_master.id', '=', 'patient_diagnosis.diagnosis_id')
+                ->leftJoin('subdiagnosis_master', 'subdiagnosis_master.id', '=', 'patient_diagnosis.sub_diagnosis_id')
+                ->where('patient_diagnosis.patient_id', $patientId)
                 ->get();
-        }
 
-        // Medical history (Always fetch, it's small and important context)
-        $medicalHistory = PatientMedicalHistory::where('patient_id', $patientId)
-            ->orderBy('id', 'desc')
-            ->first();
-
-        // Filter: Test results
-        $testResults = collect([]);
-        if ($intent === self::INTENT_FULL || $intent === self::INTENT_LABS) {
-            $testResults = TestResults::select(
-                'test_results.*',
-                'test_master.TestName'
+            // Complications 
+            $complications = PatientComplication::select(
+                'patient_complication.*',
+                'complication_master.complication_name',
+                'subcomplication_master.subcomplication_name'
             )
-                ->leftJoin('test_master', 'test_master.id', '=', 'test_results.TestId')
-                ->where('test_results.PatientId', $patientId)
-                ->orderBy('test_results.created_at', 'desc')
+                ->leftJoin('complication_master', 'complication_master.id', '=', 'patient_complication.complication_id')
+                ->leftJoin('subcomplication_master', 'subcomplication_master.id', '=', 'patient_complication.sub_complication_id')
+                ->where('patient_complication.patient_id', $patientId)
                 ->get();
-        }
 
-        // Filter: BP Status (Vitals)
-        $bpStatus = collect([]);
-        if ($intent === self::INTENT_FULL || $intent === self::INTENT_VITALS) {
-             $bpStatus = PatientBpStatus::select('patient_bpstatus.*')
-                ->join('patient_visits', 'patient_visits.id', '=', 'patient_bpstatus.visit_id')
+            // Filter: Vitals
+            $vitals = collect([]);
+            if ($intent === self::INTENT_FULL || $intent === self::INTENT_VITALS) {
+                $vitals = PatientVitals::select(
+                    'patient_vitals.*',
+                    'vitals_master.vital_name'
+                )
+                    ->leftJoin('vitals_master', 'vitals_master.id', '=', 'patient_vitals.vitals_id')
+                    ->where('patient_vitals.patient_id', $patientId)
+                    ->orderBy('patient_vitals.created_at', 'desc')
+                    ->get()
+                    ->unique('vitals_id');
+            }
+
+            // Filter: Prescriptions
+            $prescriptions = collect([]);
+            if ($intent === self::INTENT_FULL || $intent === self::INTENT_MEDS) {
+                $prescriptions = PatientPrescriptions::select(
+                    'patient_prescriptions.*',
+                    'medicine_master.medicine_name',
+                    'tablet_type_master.tablet_type_name'
+                )
+                    ->leftJoin('medicine_master', 'medicine_master.id', '=', 'patient_prescriptions.medicine_id')
+                    ->leftJoin('tablet_type_master', 'tablet_type_master.id', '=', 'patient_prescriptions.tablet_type_id')
+                    ->where('patient_prescriptions.patient_id', $patientId)
+                    ->orderBy('patient_prescriptions.created_at', 'desc')
+                    ->get();
+            }
+
+            // Medical history (Always fetch, it's small and important context)
+            $medicalHistory = PatientMedicalHistory::where('patient_id', $patientId)
+                ->orderBy('id', 'desc')
+                ->first();
+
+            // Filter: Test results
+            $testResults = collect([]);
+            if ($intent === self::INTENT_FULL || $intent === self::INTENT_LABS) {
+                $testResults = TestResults::select(
+                    'test_results.*',
+                    'test_master.TestName'
+                )
+                    ->leftJoin('test_master', 'test_master.id', '=', 'test_results.TestId')
+                    ->where('test_results.PatientId', $patientId)
+                    ->orderBy('test_results.created_at', 'desc')
+                    ->take(100) // Limit to prevent token bloat
+                    ->get();
+            }
+
+            // Filter: BP Status (Vitals)
+            $bpStatus = collect([]);
+            if ($intent === self::INTENT_FULL || $intent === self::INTENT_VITALS) {
+                 $bpStatus = PatientBpStatus::select('patient_bpstatus.*')
+                    ->join('patient_visits', 'patient_visits.id', '=', 'patient_bpstatus.visit_id')
+                    ->where('patient_visits.patient_id', $patientId)
+                    ->orderBy('patient_bpstatus.created_at', 'desc')
+                    ->take(10)
+                    ->get();
+            }
+
+            // Visits
+            $visits = PatientVisits::select(
+                'patient_visits.*',
+                'visit_type_master.visit_type_name'
+            )
+                ->leftJoin('visit_type_master', 'visit_type_master.id', '=', 'patient_visits.visit_type_id')
                 ->where('patient_visits.patient_id', $patientId)
-                ->orderBy('patient_bpstatus.created_at', 'desc')
-                ->take(10)
+                ->orderBy('patient_visits.visit_date', 'desc')
+                ->take(50) // Limit to relevant context
                 ->get();
-        }
 
-        // Visits
-        $visits = PatientVisits::select(
-            'patient_visits.*',
-            'visit_type_master.visit_type_name'
-        )
-            ->leftJoin('visit_type_master', 'visit_type_master.id', '=', 'patient_visits.visit_type_id')
-            ->where('patient_visits.patient_id', $patientId)
-            ->orderBy('patient_visits.visit_date', 'desc')
-            ->get(); // Removed limit: give ALL data to AI as requested
+            // Vaccinations
+            $vaccinations = PatientVaccination::select(
+                'patient_vaccination.*',
+                'vaccination_master.vaccination_name'
+            )
+                ->leftJoin('vaccination_master', 'vaccination_master.id', '=', 'patient_vaccination.vaccination_id')
+                ->where('patient_vaccination.patient_id', $patientId)
+                ->get();
 
-        // Vaccinations
-        $vaccinations = PatientVaccination::select(
-            'patient_vaccination.*',
-            'vaccination_master.vaccination_name'
-        )
-            ->leftJoin('vaccination_master', 'vaccination_master.id', '=', 'patient_vaccination.vaccination_id')
-            ->where('patient_vaccination.patient_id', $patientId)
-            ->get();
+            // Alerts
+            $alerts = PatientAlerts::where('patient_id', $patientId)
+                ->orderBy('created_at', 'desc')
+                ->first();
 
-        // Alerts
-        $alerts = PatientAlerts::where('patient_id', $patientId)
-            ->orderBy('created_at', 'desc')
-            ->first();
+            // eGFR
+            $egfr = $this->calculateEGFR($patientId, $age, $gender);
 
-        // eGFR
-        $egfr = $this->calculateEGFR($patientId, $age, $gender);
-
-        return [
-            'patient' => $patient,
-            'age' => $age,
-            'gender' => $gender,
-            'diagnoses' => $diagnoses,
-            'complications' => $complications,
-            'vitals' => $vitals,
-            'prescriptions' => $prescriptions,
-            'medicalHistory' => $medicalHistory,
-            'testResults' => $testResults,
-            'bpStatus' => $bpStatus,
-            'visits' => $visits,
-            'vaccinations' => $vaccinations,
-            'alerts' => $alerts,
-            'egfr' => $egfr,
-        ];
+            return [
+                'patient' => $patient,
+                'age' => $age,
+                'gender' => $gender,
+                'diagnoses' => $diagnoses,
+                'complications' => $complications,
+                'vitals' => $vitals,
+                'prescriptions' => $prescriptions,
+                'medicalHistory' => $medicalHistory,
+                'testResults' => $testResults,
+                'bpStatus' => $bpStatus,
+                'visits' => $visits,
+                'vaccinations' => $vaccinations,
+                'alerts' => $alerts,
+                'egfr' => $egfr,
+            ];
+        });
     }
 
     private function calculateEGFR(int $patientId, ?int $age, string $gender): ?float
@@ -714,8 +767,9 @@ class AiChatController extends Controller
         $prompt .= "2. NEVER say 'Based on the data', 'The patient', or 'according to records'.\n";
         $prompt .= "3. Start answers directly: 'Diagnosis is...', 'Medications indicate...', 'BP history shows...'.\n";
         $prompt .= "4. Do NOT mention the patient's name or personal details.\n";
-        $prompt .= "5. If 'Diagnosis' is empty, YOU MUST INFER it from usage of Medications (e.g., Metformin -> Diabetes, Amlodipine -> Hypertension).\n";
-        $prompt .= "6. END every response with exactly this format (1 blank line, italicized): \n\n*Verify with clinical judgment.*\n";
+        $prompt .= "5. If 'Diagnosis' is empty, you may gently note what conditions medications commonly treat (e.g., 'Metformin suggests diabetes'), but YOU MUST NOT definitively infer or state severe diseases (especially Cancer) unless explicitly listed in the DIAGNOSES section.\n";
+        $prompt .= "6. STRICT COMPLIANCE: Never assume, hallucinate, or invent data. Base all responses strictly on the provided context.\n";
+        $prompt .= "7. END every response with exactly this format (1 blank line, italicized): \n\n*Verify with clinical judgment.*\n";
         
         return $prompt;
     }
@@ -724,7 +778,8 @@ class AiChatController extends Controller
     {
         $provider = $providerOverride ?? config('services.ai.provider', 'gemini');
         $apiKey = ($provider === 'gemini') ? config('services.gemini.api_key') : (config('services.ai.api_key') ?? config('services.gemini.api_key'));
-        $model = ($provider === 'gemini') ? config('services.gemini.model') : (config('services.ai.model') ?? config('services.gemini.model'));
+        // Enforce Pro model for analysis tasks to guarantee accuracy and JSON structure adherence
+        $model = ($provider === 'gemini') ? 'gemini-1.5-pro' : (config('services.ai.model') ?? config('services.gemini.model'));
         $baseUrl = config('services.ai.base_url');
 
         if (!$apiKey || !$model) {
@@ -747,11 +802,14 @@ class AiChatController extends Controller
             ], $configOverride);
 
             $payload = [
+                'systemInstruction' => [
+                    'parts' => [['text' => $systemPrompt]]
+                ],
                 'contents' => [
                     [
                         'role' => 'user',
                         'parts' => [
-                            ['text' => ($cachedContentName ? $userMessage : ($systemPrompt . "\n\nUser Question: " . $userMessage))]
+                            ['text' => $userMessage]
                         ]
                     ]
                 ],
@@ -759,7 +817,9 @@ class AiChatController extends Controller
             ];
 
             if ($cachedContentName) {
+                // Remove prompt when cache is present
                 $payload['cachedContent'] = $cachedContentName;
+                unset($payload['systemInstruction']);
             } else {
                 // Include safety settings for normal requests
                 $payload['safetySettings'] = [
@@ -841,6 +901,7 @@ class AiChatController extends Controller
         $prompt .= "2. **Detailed Velocity:** Calculate the overall change (Last - First) AND identify the steepest drop/rise between specific adjacent dates.\n";
         $prompt .= "3. **Predictive Modeling:** Based solely on the current velocity and trajectory, estimate the potential direction/range for the *next* test result.\n";
         $prompt .= "4. **Clinical Context:** Interpret the medical significance.\n";
+        $prompt .= "5. **STRICT COMPLIANCE:** Do not hallucinate or assume any unprovided patient conditions or data outside of the provided context.\n";
         
         $prompt .= "\n=== OUTPUT RULES ===\n";
         $prompt .= "You MUST provide exactly 4 distinct bullet points. **Keep each point to ONE concise sentence (Max 25 words).**\n";

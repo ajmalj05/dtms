@@ -576,27 +576,77 @@
         isLoading = true;
         chatSend.disabled = true;
         
-        // Send request
+        // Send request (SSE Stream)
         fetch(AI_CHAT_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': CSRF_TOKEN,
-                'Accept': 'application/json'
+                'Accept': 'text/event-stream'
             },
             body: JSON.stringify({
                 patient_id: PATIENT_ID,
                 message: message
             })
         })
-        .then(response => response.json())
-        .then(data => {
+        .then(async response => {
             hideTypingIndicator();
             
-            if (data.status === 'success') {
-                addMessage(data.response, 'bot');
-            } else {
-                addMessage(data.message || 'Sorry, I encountered an error. Please try again.', 'bot');
+            if (!response.ok) {
+                let errorData = await response.json().catch(() => ({}));
+                addMessage(errorData.message || 'Sorry, I encountered an error. Please try again.', 'bot');
+                isLoading = false;
+                chatSend.disabled = false;
+                chatInput.focus();
+                return;
+            }
+            
+            // Create an empty message div for streaming text
+            const messageId = 'msg-' + Date.now();
+            const dummyDiv = document.createElement('div');
+            const avatarSvg = '<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>';
+            dummyDiv.className = `ai-chat-message bot`;
+            dummyDiv.innerHTML = `
+                <div class="ai-message-avatar">${avatarSvg}</div>
+                <div class="ai-message-content" id="${messageId}"></div>
+            `;
+            chatMessages.appendChild(dummyDiv);
+            
+            let fullText = '';
+            const contentDiv = document.getElementById(messageId);
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let buffer = '';
+            
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                buffer += decoder.decode(value, { stream: true });
+                let lines = buffer.split(/\n\n/);
+                buffer = lines.pop() || '';
+                
+                for (const block of lines) {
+                    const line = block.trim();
+                    if (line.startsWith('data: ')) {
+                        const data = line.slice(6).trim();
+                        if (data === '[DONE]') continue;
+                        
+                        try {
+                            const parsed = JSON.parse(data);
+                            if (parsed.text) {
+                                fullText += parsed.text;
+                                contentDiv.innerHTML = formatMessage(fullText);
+                                scrollToBottom();
+                            } else if (parsed.error) {
+                                contentDiv.innerHTML = formatMessage(fullText + "\\n\\n**Error:** " + parsed.error);
+                                scrollToBottom();
+                            }
+                        } catch (e) {
+                            console.error('Error parsing JSON chunk:', e, data);
+                        }
+                    }
+                }
             }
         })
         .catch(error => {
