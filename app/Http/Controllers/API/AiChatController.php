@@ -395,10 +395,13 @@ class AiChatController extends Controller
             $patient = PatientRegistration::select(
                 'patient_registration.*',
                 'patient_type_master.patient_type_name',
-                'salutation_master.salutation_name'
+                'salutation_master.salutation_name',
+                'category_master.category_name'
             )
                 ->leftJoin('patient_type_master', 'patient_type_master.id', '=', 'patient_registration.patient_type')
                 ->leftJoin('salutation_master', 'salutation_master.id', '=', 'patient_registration.salutation_id')
+                ->leftJoin('patient_category', 'patient_category.patient_id', '=', 'patient_registration.id')
+                ->leftJoin('category_master', 'category_master.id', '=', 'patient_category.category') 
                 ->where('patient_registration.id', $patientId)
                 ->first();
 
@@ -465,7 +468,7 @@ class AiChatController extends Controller
                     'tablet_type_master.tablet_type_name'
                 )
                     ->leftJoin('medicine_master', 'medicine_master.id', '=', 'patient_prescriptions.medicine_id')
-                    ->leftJoin('tablet_type_master', 'tablet_type_master.id', '=', 'patient_prescriptions.tablet_type_id')
+                    ->leftJoin('tablet_type_master', 'tablet_type_master.id', '=', 'medicine_master.tablet_type_id')
                     ->where('patient_prescriptions.patient_id', $patientId)
                     ->orderBy('patient_prescriptions.created_at', 'desc')
                     ->get();
@@ -483,7 +486,7 @@ class AiChatController extends Controller
                     'test_results.*',
                     'test_master.TestName'
                 )
-                    ->leftJoin('test_master', 'test_master.id', '=', 'test_results.TestId')
+                    ->leftJoin('test_master', 'test_master.TestId', '=', 'test_results.TestId')
                     ->where('test_results.PatientId', $patientId)
                     ->orderBy('test_results.created_at', 'desc')
                     ->take(100) // Limit to prevent token bloat
@@ -522,7 +525,8 @@ class AiChatController extends Controller
                 ->get();
 
             // Alerts
-            $alerts = PatientAlerts::where('patient_id', $patientId)
+            $alerts = PatientAlerts::select('alerts', 'psychiatric_medications', 'created_at')
+                ->where('patient_id', $patientId)
                 ->orderBy('created_at', 'desc')
                 ->first();
 
@@ -598,7 +602,15 @@ class AiChatController extends Controller
         // REMOVED: Name, UHID, Mobile, DOB to protect identity
         $prompt .= "Age: " . ($context['age'] ?? 'N/A') . " years\n";
         $prompt .= "Gender: " . $context['gender'] . "\n";
+        $prompt .= "Category: " . ($patient->category_name ?? 'N/A') . "\n";
         $prompt .= "Blood Group: " . ($patient->blood_group_id ?? 'N/A') . "\n\n";
+
+        if ($context['alerts']) {
+            $prompt .= "=== CRITICAL ALERTS ===\n";
+            if ($context['alerts']->alerts) $prompt .= "- ALERT: " . $context['alerts']->alerts . "\n";
+            if ($context['alerts']->psychiatric_medications) $prompt .= "- PSYCHIATRIC MEDS: " . $context['alerts']->psychiatric_medications . "\n";
+            $prompt .= "\n";
+        }
 
         // ... Keep identifying data OUT ...
 
@@ -747,7 +759,15 @@ class AiChatController extends Controller
 
         $prompt .= "=== COMPLETE VISITS HISTORY ===\n";
         if ($context['visits']->count() > 0) {
-            foreach ($context['visits'] as $visit) { // No take limit
+            foreach ($context['visits'] as $visit) { 
+                $prompt .= "- Date: " . ($visit->visit_date ? \Carbon\Carbon::parse($visit->visit_date)->format('d-m-Y') : 'N/A');
+                $prompt .= " (" . ($visit->visit_type_name ?? 'General') . ")";
+                if ($visit->dtms_remarks) {
+                    $prompt .= " - Note: " . $visit->dtms_remarks;
+                }
+                $prompt .= "\n";
+            }
+        }
                 $prompt .= "- " . ($visit->visit_type_name ?? 'Unknown Type') . " on " . ($visit->visit_date ?? 'N/A') . "\n";
             }
         } else {
