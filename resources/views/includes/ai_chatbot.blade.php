@@ -684,25 +684,28 @@
     
     // Format message with basic markdown
     function formatMessage(text) {
-        // Convert newlines to <br>
-        let formatted = text.replace(/\n/g, '<br>');
+        let formatted = text;
         
-        // Convert **bold** to <strong>
+        // 1. Convert **bold** to <strong>
         formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
         
-        // Convert *italic* to <em>
-        formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
+        // 2. Convert *italic* to <em>
+        formatted = formatted.replace(/\*([^*]+)\*/g, '<em>$1</em>');
         
-        // Convert bullet points
-        formatted = formatted.replace(/^- (.*?)(<br>|$)/gm, '<li>$1</li>');
+        // 3. Convert bullet points (- item or * item)
+        formatted = formatted.replace(/^[ \t]*[-*]\s+(.*)/gm, '<li>$1</li>');
         
-        // Wrap consecutive li elements in ul
-        formatted = formatted.replace(/(<li>.*?<\/li>\s*)+/g, '<ul>$&</ul>');
+        // 4. Wrap consecutive li elements in ul
+        formatted = formatted.replace(/(<li>.*?<\/li>(\s*))+/g, function(match) {
+            return '<ul style="margin: 8px 0; padding-left: 20px;">' + match.replace(/\n/g, '') + '</ul>';
+        });
         
-        // Wrap in paragraph if no HTML tags
-        if (!formatted.includes('<')) {
-            formatted = `<p>${formatted}</p>`;
-        }
+        // 5. Convert remaining newlines to <br> 
+        formatted = formatted.replace(/\n/g, '<br>');
+        
+        // 6. Clean up: remove <br> right before or after <ul> to prevent massive spacing
+        formatted = formatted.replace(/<br>\s*<ul/g, '<ul');
+        formatted = formatted.replace(/<\/ul>\s*<br>/g, '</ul>');
         
         return formatted;
     }

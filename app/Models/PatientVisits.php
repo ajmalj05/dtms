@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class PatientVisits extends Model
 {
+    use \App\Models\Traits\ClearsPatientAiCache;
+
     use HasFactory;
     public $table = "patient_visits";
     protected $fillable = ['visit_type_id', 'specialist_id', 'patient_id','visit_date','notes','branch_id',

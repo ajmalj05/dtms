@@ -147,7 +147,7 @@ class AiChatController extends Controller
         $url = $geminiBaseUrl . "{$model}:streamGenerateContent?alt=sse&key=" . $apiKey;
 
         $generationConfig = [
-            'temperature' => 0.3,
+            'temperature' => 0.1,
             'topK' => 40,
             'topP' => 0.95,
             'maxOutputTokens' => 8192,
@@ -206,7 +206,8 @@ class AiChatController extends Controller
 
         curl_exec($ch);
         if(curl_errno($ch)) {
-            echo "data: " . json_encode(['error' => curl_error($ch)]) . "\n\n";
+            \Log::error("Gemini Streaming Error", ['curl_error' => curl_error($ch)]);
+            echo "data: " . json_encode(['error' => 'Connection to AI server interrupted. Please refresh the page and try again.']) . "\n\n";
         }
         curl_close($ch);
         
@@ -260,9 +261,9 @@ class AiChatController extends Controller
             $analysisPrompt .= "1. NO REDUNDANCY: Do not repeat facts from the Summary in the Flags section unless it is to highlight a dangerous change.\n";
             $analysisPrompt .= "2. BE AGGRESSIVE: If labs are abnormal (like Creatinine 3.8), this is a major flag, not just a summary point.\n";
             $analysisPrompt .= "3. NO Generic flags: Avoid 'Regular follow-up'. Find actual clinical gaps.\n";
-            $analysisPrompt .= "4. Base clinical analysis on LONG-TERM trends provided in the full context.\n";
-            $analysisPrompt .= "5. CONCLUSION must be authoritative and actionable.\n";
-            $analysisPrompt .= "6. STRICT COMPLIANCE: Use ONLY the explicit data provided. Do NOT hallucinate, guess, or assume any medical conditions, treatments, or missing data points.\n";
+            $analysisPrompt .= "4. Base clinical analysis ONLY on LONG-TERM trends provided in the full context.\n";
+            $analysisPrompt .= "5. CONCLUSION must be authoritative and actionable based on exact data.\n";
+            $analysisPrompt .= "6. ABSOLUTE RULE: STRICT COMPLIANCE REQUIRED. Use ONLY the explicitly provided data. You are STRICTLY FORBIDDEN from hallucinating, guessing, inferring, or assuming any medical conditions, treatments, past history, or missing data points.\n";
 
             $responseSchema = [
                 'type' => 'OBJECT',
@@ -768,8 +769,9 @@ class AiChatController extends Controller
         $prompt .= "3. Start answers directly: 'Diagnosis is...', 'Medications indicate...', 'BP history shows...'.\n";
         $prompt .= "4. Do NOT mention the patient's name or personal details.\n";
         $prompt .= "5. If 'Diagnosis' is empty, you may gently note what conditions medications commonly treat (e.g., 'Metformin suggests diabetes'), but YOU MUST NOT definitively infer or state severe diseases (especially Cancer) unless explicitly listed in the DIAGNOSES section.\n";
-        $prompt .= "6. STRICT COMPLIANCE: Never assume, hallucinate, or invent data. Base all responses strictly on the provided context.\n";
-        $prompt .= "7. END every response with exactly this format (1 blank line, italicized): \n\n*Verify with clinical judgment.*\n";
+        $prompt .= "6. ABSOLUTE RULE: You MUST ONLY use the explicit data provided in this prompt. YOU ARE STRICTLY FORBIDDEN FROM HALLUCINATING, GUESSING, INFERRING, OR ASSUMING ANY MEDICAL CONDITIONS, TREATMENTS, OR MISSING DATA POINTS.\n";
+        $prompt .= "7. If a user asks for data that is missing from this prompt, reply EXACTLY with 'Data not available in records.' Do not offer explanations.\n";
+        $prompt .= "8. END every response with exactly this format (1 blank line, italicized): \n\n*Verify with clinical judgment.*\n";
         
         return $prompt;
     }
@@ -901,7 +903,7 @@ class AiChatController extends Controller
         $prompt .= "2. **Detailed Velocity:** Calculate the overall change (Last - First) AND identify the steepest drop/rise between specific adjacent dates.\n";
         $prompt .= "3. **Predictive Modeling:** Based solely on the current velocity and trajectory, estimate the potential direction/range for the *next* test result.\n";
         $prompt .= "4. **Clinical Context:** Interpret the medical significance.\n";
-        $prompt .= "5. **STRICT COMPLIANCE:** Do not hallucinate or assume any unprovided patient conditions or data outside of the provided context.\n";
+        $prompt .= "5. **ABSOLUTE RULE:** STRICT COMPLIANCE REQUIRED. Do not hallucinate, assume, or infer any unprovided patient conditions, metadata, or data points outside of the immediate context.\n";
         
         $prompt .= "\n=== OUTPUT RULES ===\n";
         $prompt .= "You MUST provide exactly 4 distinct bullet points. **Keep each point to ONE concise sentence (Max 25 words).**\n";
@@ -964,7 +966,7 @@ class AiChatController extends Controller
                 'systemInstruction' => [
                     'parts' => [['text' => $systemPrompt]]
                 ],
-                'ttl' => '3600s' // 1 hour cache
+                'ttl' => '36000s' // 1 hour cache
             ];
 
             $response = Http::timeout(30)->post($url, $payload);
@@ -974,6 +976,17 @@ class AiChatController extends Controller
                 if ($name) {
                     \Log::info("Gemini Context Cache Created: {$name} for Patient: {$patientId}");
                     Cache::put($cacheKey, $name, 3500); // Store name in Laravel for 58 mins
+                    
+                    // Track this cache for deletion when patient records update
+                    $trackerKey = "gemini_caches_for_{$patientId}";
+                    $activeCaches = Cache::get($trackerKey, []);
+                    if (!in_array($name, $activeCaches)) {
+                        $activeCaches[] = $name;
+                        // Keep array size reasonable
+                        if (count($activeCaches) > 10) array_shift($activeCaches);
+                        Cache::put($trackerKey, $activeCaches, 86400); // 1 day
+                    }
+                    
                     return $name;
                 }
             } else {
@@ -988,5 +1001,38 @@ class AiChatController extends Controller
         }
 
         return null; // Fallback to normal prompt
+    }
+
+    /**
+     * Clear all cached AI context for a patient to prevent hallucinations from stale data.
+     * This is called by the ClearsPatientAiCache trait on relevant Eloquent models.
+     */
+    public static function clearPatientAiCache(int $patientId)
+    {
+        // 1. Clear Laravel summary cache & individual context elements
+        Cache::forget("ai_patient_analysis_" . $patientId);
+        Cache::forget("dtms_ai_context_{$patientId}_" . self::INTENT_FULL);
+        Cache::forget("dtms_ai_context_{$patientId}_" . self::INTENT_VITALS);
+        Cache::forget("dtms_ai_context_{$patientId}_" . self::INTENT_MEDS);
+        Cache::forget("dtms_ai_context_{$patientId}_" . self::INTENT_LABS);
+
+        // 2. Clear known Gemini cached contents from Google Servers
+        $trackerKey = "gemini_caches_for_{$patientId}";
+        $activeCaches = Cache::get($trackerKey, []);
+        
+        $provider = config('services.ai.provider', 'gemini');
+        $apiKey = ($provider === 'gemini') ? config('services.gemini.api_key') : (config('services.ai.api_key') ?? config('services.gemini.api_key'));
+
+        if ($apiKey && !empty($activeCaches)) {
+            foreach ($activeCaches as $cachedContentName) {
+                try {
+                    Http::timeout(10)->delete("https://generativelanguage.googleapis.com/v1beta/{$cachedContentName}?key={$apiKey}");
+                } catch (\Exception $e) {
+                    \Log::warning("Failed to delete Gemini Context Cache: {$cachedContentName}", ['error' => $e->getMessage()]);
+                }
+            }
+        }
+        
+        Cache::forget($trackerKey);
     }
 }

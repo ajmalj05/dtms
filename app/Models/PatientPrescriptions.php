@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class PatientPrescriptions extends Model
 {
+    use \App\Models\Traits\ClearsPatientAiCache;
+
     use HasFactory;
     public $table = "patient_prescriptions";
     protected $primaryKey = 'id';
