@@ -767,9 +767,6 @@ class AiChatController extends Controller
                 }
                 $prompt .= "\n";
             }
-        }
-                $prompt .= "- " . ($visit->visit_type_name ?? 'Unknown Type') . " on " . ($visit->visit_date ?? 'N/A') . "\n";
-            }
         } else {
             $prompt .= "No visits recorded\n";
         }
