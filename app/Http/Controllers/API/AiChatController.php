@@ -264,6 +264,7 @@ class AiChatController extends Controller
             $analysisPrompt .= "4. Base clinical analysis ONLY on LONG-TERM trends provided in the full context.\n";
             $analysisPrompt .= "5. CONCLUSION must be authoritative and actionable based on exact data.\n";
             $analysisPrompt .= "6. ABSOLUTE RULE: STRICT COMPLIANCE REQUIRED. Use ONLY the explicitly provided data. You are STRICTLY FORBIDDEN from hallucinating, guessing, inferring, or assuming any medical conditions, treatments, past history, or missing data points.\n";
+            $analysisPrompt .= "7. COMPARATIVE FLAGGING: Track values over time. If a value was historically high and decreased in the latest test but is STILL abnormal, flag it comparatively (e.g., 'HbA1c decreased to 9.0 from historical average of 10.5, but remains high'). Always compare current abnormal values to past historical averages or recent previous values to provide context on the trend.\n";
 
             $responseSchema = [
                 'type' => 'OBJECT',
@@ -279,7 +280,7 @@ class AiChatController extends Controller
                     'flags' => [
                         'type' => 'ARRAY',
                         'items' => ['type' => 'STRING'],
-                        'description' => "ACTIONABLE ALERTS & VARIATIONS (The Action). Highlight ONLY things that are WRONG or CHANGING. MUST Flag: 1) Dangerous Trends (e.g., Creatinine rose from X to Y), 2) Out-of-range Labs (Creatinine > 1.2, HbA1c > 7), 3) Missing Screenings (Foot/Eye exam overdue > 12 months), 4) Critical Variations in metabolic control."
+                        'description' => "ACTIONABLE ALERTS & VARIATIONS (The Action). Highlight ONLY things that are WRONG or CHANGING. MUST Flag: 1) Dangerous Trends (e.g., Creatinine rose from X to Y), 2) Out-of-range Labs (Creatinine > 1.2, HbA1c > 7), 3) Missing Screenings, 4) Comparative flags for persistent abnormal values (e.g. 'HbA1c decreased to 9.0 from 10.0 but remains high', or 'HbA1c is persistently high, currently 9.0, up from 8.5')."
                     ],
                     'conclusion' => [
                         'type' => 'STRING',
@@ -798,7 +799,7 @@ class AiChatController extends Controller
         $provider = $providerOverride ?? config('services.ai.provider', 'gemini');
         $apiKey = ($provider === 'gemini') ? config('services.gemini.api_key') : (config('services.ai.api_key') ?? config('services.gemini.api_key'));
         // Enforce Pro model for analysis tasks to guarantee accuracy and JSON structure adherence
-        $model = ($provider === 'gemini') ? 'gemini-2.5-pro' : (config('services.ai.model') ?? config('services.gemini.model'));
+        $model = 'gemini-2.5-flash';
         $baseUrl = config('services.ai.base_url');
 
         if (!$apiKey || !$model) {
@@ -814,7 +815,7 @@ class AiChatController extends Controller
             $url = $geminiBaseUrl . "{$model}:generateContent?key=" . $apiKey;
 
             $generationConfig = array_merge([
-                'temperature' => 0.3,
+                'temperature' => 0.1,
                 'topK' => 40,
                 'topP' => 0.95,
                 'maxOutputTokens' => 8192,
@@ -974,7 +975,7 @@ class AiChatController extends Controller
 
         try {
             $apiKey = config('services.gemini.api_key');
-            $model = config('services.gemini.model');
+            $model = 'gemini-2.5-flash';
             $url = "https://generativelanguage.googleapis.com/v1beta/cachedContents?key=" . $apiKey;
 
             $payload = [
