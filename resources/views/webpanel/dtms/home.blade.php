@@ -275,7 +275,7 @@
                             <button type="button" title="Save DTMS" class="btn btn-sm btn-primary mt-1 saveAllDtmsDatabtn" onclick="saveAllDtmsData(1)">Save</button>
                         </div>
                         
-                        <div class="p-2 text-center ml-auto" style="margin-right: 70px;">
+                        <div class="p-2 text-center" style="margin-left: 10px;">
                             <!-- Premium AI Analysis Button (Matches Chatbot Design) -->
                              <button type="button" class="btn-ai-analysis mt-1" onclick="openPatientAnalysis()">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="mr-2" style="display:inline-block; vertical-align:middle;">
@@ -349,6 +349,8 @@
                                 }
                              </style>
                         </div>
+                        
+
 
                         <div class="toast" data-autohide="false" id="image-status" style="display: none;">
                             <div class="toast-header">

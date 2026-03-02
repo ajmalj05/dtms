@@ -609,6 +609,28 @@
             
             const utterance = new SpeechSynthesisUtterance(textToSpeak);
             
+            // --- Customization ---
+            // 1. Get available voices
+            const voices = window.speechSynthesis.getVoices();
+            
+            // 2. Select an Indian Female voice
+            // Note: Voices load asynchronously in some browsers, so we check if they exist.
+            if (voices.length > 0) {
+                // Prioritize: Google's Indian English Female voice -> Any Indian English Female -> Any Indian English
+                const selectedVoice = voices.find(voice => voice.name.includes('Google') && voice.lang === 'en-IN') || 
+                                      voices.find(voice => voice.lang === 'en-IN' && (voice.name.includes('Female') || voice.voiceURI.includes('Female'))) ||
+                                      voices.find(voice => voice.lang === 'en-IN');
+                                      
+                if (selectedVoice) {
+                    utterance.voice = selectedVoice;
+                }
+            }
+            
+            // 3. Customize pitch and rate (speed)
+            utterance.pitch = 1.1; // Default is 1 (Range: 0 to 2) - higher is more female-sounding/squeaky
+            utterance.rate = 1.0;  // Default is 1 (Range: 0.1 to 10) - higher is faster
+            // --------------------
+
             if (btnElement) {
                 btnElement.classList.add('speaking');
                 utterance.onend = function() {
