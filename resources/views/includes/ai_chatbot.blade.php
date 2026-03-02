@@ -295,6 +295,34 @@
     font-weight: 600;
 }
 
+.ai-message-tts {
+    background: none;
+    border: none;
+    color: #667eea;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 50%;
+    transition: all 0.2s;
+    opacity: 0.6;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    align-self: flex-start;
+}
+.ai-message-tts:hover, .ai-message-tts.speaking {
+    opacity: 1;
+    background: rgba(102, 126, 234, 0.1);
+}
+.ai-message-tts.speaking {
+    color: #4CAF50;
+    animation: ai-pulse 1.5s infinite;
+}
+@keyframes ai-pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
 .ai-typing-indicator {
     display: flex;
     gap: 4px;
@@ -467,15 +495,22 @@
                         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
                     </svg>
                 </div>
-                <div class="ai-message-content">
-                    <p>Hello! I'm your AI medical assistant. I have access to <strong>{{ isset($patient_data) ? $patient_data->name : 'this patient' }}'s</strong> complete medical records.</p>
-                    <p>Ask me anything about their:</p>
-                    <ul>
-                        <li>Diagnosis & Complications</li>
-                        <li>Medications & Prescriptions</li>
-                        <li>Lab Results & Vitals</li>
-                        <li>Medical History</li>
-                    </ul>
+                <div style="display: flex; flex-direction: column;">
+                    <div class="ai-message-content" id="msg-initial">
+                        <p>Hello! I'm your AI medical assistant. I have access to <strong>{{ isset($patient_data) ? $patient_data->name : 'this patient' }}'s</strong> complete medical records.</p>
+                        <p>Ask me anything about their:</p>
+                        <ul>
+                            <li>Diagnosis & Complications</li>
+                            <li>Medications & Prescriptions</li>
+                            <li>Lab Results & Vitals</li>
+                            <li>Medical History</li>
+                        </ul>
+                    </div>
+                    <div class="ai-message-actions" style="display:flex; margin-top: 4px;">
+                        <button class="ai-message-tts" onclick="window.aiSpeakText(this, 'msg-initial')" title="Read Aloud">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -553,6 +588,43 @@
         }
     };
     
+    // Text to Speech
+    window.aiSpeakText = function(btnElement, messageId) {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel(); // Stop any current speech
+            
+            // If already speaking the same thing, just cancel and return (toggle)
+            if (btnElement && btnElement.classList.contains('speaking')) {
+                btnElement.classList.remove('speaking');
+                return;
+            }
+            
+            // Remove speaking class from all other buttons
+            document.querySelectorAll('.ai-message-tts').forEach(el => el.classList.remove('speaking'));
+            
+            const contentDiv = document.getElementById(messageId);
+            if (!contentDiv) return;
+            
+            const textToSpeak = contentDiv.innerText || contentDiv.textContent;
+            
+            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            
+            if (btnElement) {
+                btnElement.classList.add('speaking');
+                utterance.onend = function() {
+                    btnElement.classList.remove('speaking');
+                };
+                utterance.onerror = function() {
+                    btnElement.classList.remove('speaking');
+                };
+            }
+            
+            window.speechSynthesis.speak(utterance);
+        } else {
+            alert("Your browser doesn't support Text to Speech.");
+        }
+    };
+    
     // Send quick message
     window.aiSendQuickMessage = function(message) {
         chatInput.value = message;
@@ -608,7 +680,14 @@
             dummyDiv.className = `ai-chat-message bot`;
             dummyDiv.innerHTML = `
                 <div class="ai-message-avatar">${avatarSvg}</div>
-                <div class="ai-message-content" id="${messageId}"></div>
+                <div style="display: flex; flex-direction: column;">
+                    <div class="ai-message-content" id="${messageId}"></div>
+                    <div class="ai-message-actions" id="actions-${messageId}" style="display:none; margin-top: 4px;">
+                        <button class="ai-message-tts" onclick="window.aiSpeakText(this, '${messageId}')" title="Read Aloud">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                        </button>
+                    </div>
+                </div>
             `;
             chatMessages.appendChild(dummyDiv);
             
@@ -630,7 +709,10 @@
                     const line = block.trim();
                     if (line.startsWith('data: ')) {
                         const data = line.slice(6).trim();
-                        if (data === '[DONE]') continue;
+                        if (data === '[DONE]') {
+                            document.getElementById('actions-' + messageId).style.display = 'flex';
+                            continue;
+                        }
                         
                         try {
                             const parsed = JSON.parse(data);
@@ -665,6 +747,7 @@
     function addMessage(text, sender) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `ai-chat-message ${sender}`;
+        const messageId = 'msg-' + Date.now() + Math.floor(Math.random() * 1000);
         
         const avatarSvg = sender === 'bot' 
             ? '<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>'
@@ -673,10 +756,24 @@
         // Format text with basic markdown
         const formattedText = formatMessage(text);
         
-        messageDiv.innerHTML = `
-            <div class="ai-message-avatar">${avatarSvg}</div>
-            <div class="ai-message-content">${formattedText}</div>
-        `;
+        if (sender === 'bot') {
+            messageDiv.innerHTML = `
+                <div class="ai-message-avatar">${avatarSvg}</div>
+                <div style="display: flex; flex-direction: column;">
+                    <div class="ai-message-content" id="${messageId}">${formattedText}</div>
+                    <div class="ai-message-actions" id="actions-${messageId}" style="display:flex; margin-top: 4px;">
+                        <button class="ai-message-tts" onclick="window.aiSpeakText(this, '${messageId}')" title="Read Aloud">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                        </button>
+                    </div>
+                </div>
+            `;
+        } else {
+            messageDiv.innerHTML = `
+                <div class="ai-message-avatar">${avatarSvg}</div>
+                <div class="ai-message-content" id="${messageId}">${formattedText}</div>
+            `;
+        }
         
         chatMessages.appendChild(messageDiv);
         scrollToBottom();
