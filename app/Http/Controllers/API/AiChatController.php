@@ -570,11 +570,14 @@ class AiChatController extends Controller
 
         if (strtolower($gender) === 'female') {
             $val = ($scr <= 0.7) ? -0.329 : -1.209;
+            // Female multiplier is 141 * 1.018, Kappa is 0.7
+            $egfr = (141 * 1.018) * pow(($scr / 0.7), $val) * pow(0.993, $age);
         } else {
             $val = ($scr <= 0.9) ? -0.411 : -1.209;
+            // Male multiplier is 141, Kappa is 0.9
+            $egfr = 141 * pow(($scr / 0.9), $val) * pow(0.993, $age);
         }
 
-        $egfr = 144 * pow(($scr / 0.7), $val) * pow(0.993, $age);
         return round($egfr, 2);
     }
 
@@ -701,9 +704,22 @@ class AiChatController extends Controller
                 $prompt .= "- {$testName}: Latest " . ($latest->ResultValue ?? 'N/A') . ($latest->unit ? " " . $latest->unit : "");
                 $prompt .= " (Date: " . ($latest->created_at ? \Carbon\Carbon::parse($latest->created_at)->format('d-m-Y') : 'N/A') . ")";
                 
-                if ($results->count() > 1) {
-                    $prev = $results->get(1);
-                    $prompt .= " [Prev: " . ($prev->ResultValue ?? 'N/A') . "]";
+                    // Provide up to the last 5 previous results for proper trend analysis
+                    $previousResultsStr = [];
+                    $count = 0;
+                    // Start from index 1 because index 0 is the "latest" which we already appended above
+                    for ($i = 1; $i < $results->count() && $count < 5; $i++) {
+                        $p = $results->get($i);
+                        if ($p && isset($p->ResultValue)) {
+                            $pDate = $p->created_at ? \Carbon\Carbon::parse($p->created_at)->format('d-m-Y') : 'Unknown Date';
+                            $previousResultsStr[] = $p->ResultValue . " (" . $pDate . ")";
+                            $count++;
+                        }
+                    }
+                    
+                    if (!empty($previousResultsStr)) {
+                        $prompt .= " [Previous History (Newest to Oldest): " . implode(" -> ", $previousResultsStr) . "]";
+                    }
                     
                     // Historical range for long-term insight
                     $values = $results->pluck('ResultValue')->map(fn($v) => (float)$v)->filter();

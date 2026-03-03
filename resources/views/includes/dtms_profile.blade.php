@@ -152,13 +152,17 @@ $egfr_value = null;
 if ($scr !== null && $age !== null && $gender !== null) {
     if ($gender == 'f') {
         $val = ($scr <= 0.7) ? -0.329 : -1.209;
+        // Female multiplier is 141 * 1.018, Kappa is 0.7
+        $egfr = (141 * 1.018) * pow(($scr / 0.7), $val) * pow(0.993, $age);
     } else if ($gender == 'm') {
         $val = ($scr <= 0.9) ? -0.411 : -1.209;
+        // Male multiplier is 141, Kappa is 0.9
+        $egfr = 141 * pow(($scr / 0.9), $val) * pow(0.993, $age);
     }
 
-    $egfr = (144 * pow(($scr / 0.7), $val)) * pow(0.993, $age);
-    $egfr_value = round($egfr, 2);
-
+    if (isset($egfr)) {
+        $egfr_value = round($egfr, 2);
+    }
 }
 
 // Display calculated eGFR
