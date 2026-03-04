@@ -967,88 +967,6 @@ class AiChatController extends Controller
     }
 
     /**
-     * AI Safety Check for New Medications
-     */
-    public function medicationCheck(Request $request)
-    {
-        $request->validate([
-            'medications' => 'required|array',
-            'psychiatric_medications' => 'nullable|string'
-        ]);
-
-        $medications = $request->medications; // Array of {name, dose}
-        $psych_meds = $request->psychiatric_medications ?? 'None';
-
-        // 1. Build the Prompt
-        $prompt = "You are an expert clinical pharmacist. Review the following proposed medication list for a patient to ensure safety before they are saved to the patient's record.\n\n";
-        
-        $prompt .= "=== PROPOSED MEDICATIONS ===\n";
-        foreach ($medications as $med) {
-             $prompt .= "- {$med['name']} (Dose: {$med['dose']})\n";
-        }
-        $prompt .= "\n=== PSYCHIATRIC MEDICATIONS ===\n{$psych_meds}\n\n";
-
-        $prompt .= "=== SAFETY CHECK RULES ===\n";
-        $prompt .= "1. **Severe Drug-Drug Interactions:** Check for any severe or contraindicated interactions between the listed medications (including psychiatric ones).\n";
-        $prompt .= "2. **Cumulative Dosage Limits:** Check if the combined dose of any specific active ingredient exceeds safe daily limits (e.g., Magnesium supplements combined should not exceed safe clinical limits).\n";
-        $prompt .= "3. **Immediate Risk Only:** Only flag issues that are immediately dangerous or clinically contraindicated. Ignore minor or common side effects.\n";
-        
-        $prompt .= "\nIf the combination is SAFE, output safe: true and a brief confirmation.\n";
-        $prompt .= "If the combination is UNSAFE, output safe: false and a concise reason explaining the exact danger.\n";
-
-        $responseSchema = [
-            'type' => 'OBJECT',
-            'properties' => [
-                'safe' => [
-                    'type' => 'BOOLEAN',
-                    'description' => "True if the medication combination and doses are safe. False if there is a severe interaction or overdose limit exceeded."
-                ],
-                'reason' => [
-                    'type' => 'STRING',
-                    'description' => "If safe is false, provide a concise explanation of the danger. If safe is true, say 'No severe interactions detected.'"
-                ]
-            ],
-            'required' => ['safe', 'reason']
-        ];
-
-        // 2. Call AI with JSON enforcement
-        $result = $this->callAI(
-            "You are a clinical pharmacist AI. Output strictly valid JSON.", 
-            $prompt,
-            [
-                'responseMimeType' => 'application/json',
-                'responseSchema' => $responseSchema
-            ]
-        );
-
-        if ($result['status'] === 'success') {
-            $jsonObj = json_decode($result['response'], true);
-            
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                // Fallback to safe if JSON is broken to prevent blocking workflow
-                return response()->json([
-                    'status' => 'success',
-                    'data' => ['safe' => true, 'reason' => 'AI validation failed, proceeding with save.']
-                ]);
-            }
-            
-            return response()->json([
-                'status' => 'success',
-                'data' => [
-                    'safe' => $jsonObj['safe'],
-                    'reason' => $jsonObj['reason']
-                ]
-            ]);
-        } else {
-             // Fallback to safe if API fails to prevent blocking workflow
-             return response()->json([
-                'status' => 'success',
-                'data' => ['safe' => true, 'reason' => 'AI validation unavailable, proceeding with save.']
-            ]);
-        }
-    }
-
-    /**
      * Gemini Context Caching Logic
      * Creates or retrieves a CachedContent resource for large patient histories.
      */
@@ -1116,6 +1034,198 @@ class AiChatController extends Controller
         }
 
         return null; // Fallback to normal prompt
+    }
+
+    /**
+     * Validate current prescription medicines using AI.
+     * Checks: dose limits per patient profile, drug-drug interactions,
+     * and patient-specific contraindications.
+     */
+    public function validatePrescription(Request $request)
+    {
+        try {
+            if (!Auth::check()) {
+                return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'patient_id' => 'required|integer|exists:patient_registration,id',
+                'medicines'  => 'required|array|min:1',
+                'medicines.*.name'        => 'required|string',
+                'medicines.*.dose'        => 'nullable|string',
+                'medicines.*.frequency'   => 'nullable|string',
+                'medicines.*.tablet_type' => 'nullable|string',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Invalid input',
+                    'errors'  => $validator->errors()
+                ], 422);
+            }
+
+            $patientId = (int) $request->patient_id;
+            $medicines = $request->medicines;
+
+            // Fetch full patient context (age, gender, diagnoses, complications, medical history, allergies)
+            $context = $this->getPatientContext($patientId, self::INTENT_FULL);
+            if (!$context) {
+                return response()->json(['status' => 'error', 'message' => 'Patient not found'], 404);
+            }
+
+            // --- Build the validation prompt ---
+            $patient  = $context['patient'];
+            $age      = $context['age'] ?? 'Unknown';
+            $gender   = $context['gender'] ?? 'Unknown';
+
+            $systemPrompt  = "You are a clinical pharmacologist AI embedded in a Diabetes Hospital system. ";
+            $systemPrompt .= "Your ONLY job is to validate a prescription list against patient-specific safety rules. ";
+            $systemPrompt .= "Be concise, clinical, and accurate. Do NOT hallucinate or guess missing data. ";
+            $systemPrompt .= "Use ONLY the data explicitly provided. ";
+            $systemPrompt .= "ABSOLUTE RULE: Never infer conditions not listed. Never assume knowledge beyond the provided context.\n";
+
+            $userPrompt  = "=== PATIENT PROFILE ===\n";
+            $userPrompt .= "Age: {$age} years\n";
+            $userPrompt .= "Gender: {$gender}\n";
+
+            // Diagnoses
+            $diagnosesList = [];
+            if ($context['diagnoses']->count() > 0) {
+                foreach ($context['diagnoses'] as $d) {
+                    $label = $d->diagnosis_name ?? 'Unknown';
+                    if ($d->subdiagnosis_name) $label .= " ({$d->subdiagnosis_name})";
+                    $diagnosesList[] = $label;
+                }
+            }
+            $userPrompt .= "Diagnoses: " . (empty($diagnosesList) ? 'None recorded' : implode(', ', $diagnosesList)) . "\n";
+
+            // Complications
+            $compList = [];
+            if ($context['complications']->count() > 0) {
+                foreach ($context['complications'] as $c) {
+                    $label = $c->complication_name ?? 'Unknown';
+                    if ($c->subcomplication_name) $label .= " ({$c->subcomplication_name})";
+                    $compList[] = $label;
+                }
+            }
+            $userPrompt .= "Complications: " . (empty($compList) ? 'None recorded' : implode(', ', $compList)) . "\n";
+
+            // Medical History (Allergies etc.)
+            if ($context['medicalHistory']) {
+                $mh = $context['medicalHistory'];
+                if ($mh->allergy) $userPrompt .= "Known Allergies: {$mh->allergy}\n";
+                if ($mh->past_history) $userPrompt .= "Past Medical History: {$mh->past_history}\n";
+            }
+
+            // eGFR
+            if ($context['egfr']) {
+                $userPrompt .= "eGFR (Calculated): {$context['egfr']} mL/min/1.73m²\n";
+            }
+
+            // Psychiatric alerts
+            if ($context['alerts'] && $context['alerts']->psychiatric_medications) {
+                $userPrompt .= "Psychiatric Medications on Record: {$context['alerts']->psychiatric_medications}\n";
+            }
+
+            $userPrompt .= "\n=== CURRENT PRESCRIPTION BEING VALIDATED ===\n";
+            foreach ($medicines as $idx => $med) {
+                $num = $idx + 1;
+                $name  = $med['name'] ?? 'Unknown';
+                $dose  = $med['dose'] ?? 'Not specified';
+                $freq  = $med['frequency'] ?? 'Not specified';
+                $type  = $med['tablet_type'] ?? '';
+                $userPrompt .= "{$num}. Medicine: {$name}";
+                if ($type) $userPrompt .= " [{$type}]";
+                $userPrompt .= " | Dose: {$dose} | Frequency: {$freq}\n";
+            }
+
+            $userPrompt .= "\n=== VALIDATION INSTRUCTIONS ===\n";
+            $userPrompt .= "Analyze the prescription for the following issues:\n";
+            $userPrompt .= "1. DOSE SAFETY: Check if the dose of any individual medicine or the COMBINED dose of medicines sharing the same active ingredient exceeds the safe maximum for this patient's age and gender. Flag even if the combined total is slightly over the limit.\n";
+            $userPrompt .= "2. DRUG INTERACTIONS: Identify any dangerous or clinically significant drug-drug interactions between the listed medicines (e.g., medicines that should not be taken together, or medicines conflicting when given at the same frequency/timing).\n";
+            $userPrompt .= "3. CONTRAINDICATIONS: Flag any medicine that is contraindicated given the patient's diagnoses, complications, organ function (eGFR), allergies, or medical history.\n";
+            $userPrompt .= "4. If there are NO issues at all, set overall_safe to true and return an empty issues array.\n";
+            $userPrompt .= "5. Do NOT flag theoretical or extremely rare interactions unless they are clinically significant.\n";
+
+            $responseSchema = [
+                'type' => 'OBJECT',
+                'properties' => [
+                    'overall_safe' => [
+                        'type' => 'BOOLEAN',
+                        'description' => 'true if no significant safety issues are found, false if any issues exist.'
+                    ],
+                    'issues' => [
+                        'type' => 'ARRAY',
+                        'description' => 'List of identified safety issues. Empty array if overall_safe is true.',
+                        'items' => [
+                            'type' => 'OBJECT',
+                            'properties' => [
+                                'severity' => [
+                                    'type' => 'STRING',
+                                    'description' => 'One of: CRITICAL, WARNING, or INFO',
+                                    'enum' => ['CRITICAL', 'WARNING', 'INFO']
+                                ],
+                                'type' => [
+                                    'type' => 'STRING',
+                                    'description' => 'One of: DOSE_EXCEEDED, DRUG_INTERACTION, CONTRAINDICATION, or OTHER',
+                                    'enum' => ['DOSE_EXCEEDED', 'DRUG_INTERACTION', 'CONTRAINDICATION', 'OTHER']
+                                ],
+                                'medicines_involved' => [
+                                    'type' => 'ARRAY',
+                                    'items' => ['type' => 'STRING'],
+                                    'description' => 'Names of the medicine(s) involved in this issue.'
+                                ],
+                                'explanation' => [
+                                    'type' => 'STRING',
+                                    'description' => 'Clear, concise clinical explanation of the issue (1-2 sentences max).'
+                                ]
+                            ],
+                            'required' => ['severity', 'type', 'medicines_involved', 'explanation']
+                        ]
+                    ],
+                    'recommendations' => [
+                        'type' => 'STRING',
+                        'description' => 'A brief overall recommendation for the prescribing physician (1-3 sentences). If overall_safe is true, state that the prescription appears clinically appropriate.'
+                    ]
+                ],
+                'required' => ['overall_safe', 'issues', 'recommendations']
+            ];
+
+            $result = $this->callAI($systemPrompt, $userPrompt, [
+                'responseMimeType' => 'application/json',
+                'responseSchema'   => $responseSchema,
+                'temperature'      => 0.1,
+                'maxOutputTokens'  => 4096,
+            ]);
+
+            if ($result['status'] === 'error') {
+                return response()->json(['status' => 'error', 'message' => $result['message'] ?? 'AI validation failed'], 500);
+            }
+
+            $jsonObj = json_decode($result['response'], true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                Log::warning('AI Prescription Validation JSON Decode Failed', [
+                    'error' => json_last_error_msg(),
+                    'raw'   => $result['response']
+                ]);
+                return response()->json(['status' => 'error', 'message' => 'Failed to parse AI response. Please try again.'], 500);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'data'   => [
+                    'overall_safe'    => $jsonObj['overall_safe'] ?? true,
+                    'issues'          => $jsonObj['issues'] ?? [],
+                    'recommendations' => $jsonObj['recommendations'] ?? '',
+                ],
+                'usage' => $result['usage'] ?? []
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('AI Prescription Validation Error', ['error' => $e->getMessage()]);
+            return response()->json(['status' => 'error', 'message' => 'Validation failed: ' . $e->getMessage()], 500);
+        }
     }
 
     /**

@@ -66,7 +66,6 @@ Route::middleware([
     Route::post('/api/ai/chat', [App\Http\Controllers\API\AiChatController::class, 'handleChat']);
     Route::post('/api/ai/analyze', [App\Http\Controllers\API\AiChatController::class, 'getSummary'])->name('ai.analyze');
     Route::post('/api/ai/analyze-trend', [App\Http\Controllers\API\AiChatController::class, 'analyzeTrend'])->name('ai.analyze-trend');
-    Route::post('/api/ai/medication-check', [App\Http\Controllers\API\AiChatController::class, 'medicationCheck'])->name('ai.medication-check');
 
 
     Route::post('/masterData/saveDepartment', [App\Http\Controllers\users\MasterDataController::class, 'saveDepartment'])->name('saveDepartment');
@@ -351,6 +350,8 @@ Route::middleware([
     // AI Chat for Patient Context
     Route::post('/ai-chat', [App\Http\Controllers\API\AiChatController::class, 'chat'])->name('ai.chat');
     Route::post('/ai-patient-summary', [App\Http\Controllers\API\AiChatController::class, 'getSummary'])->name('ai.summary');
+    Route::post('/ai-validate-prescription', [App\Http\Controllers\API\AiChatController::class, 'validatePrescription'])->name('ai.validate-prescription');
+
     
     //Remainder
     Route::post('/saveRemainder', [App\Http\Controllers\users\DtmsController::class, 'saveRemainder'])->name('saveRemainder');
