@@ -726,7 +726,6 @@ class AiChatController extends Controller
                     if ($values->count() > 0) {
                         $prompt .= " | Hist. Range: " . $values->min() . " - " . $values->max();
                     }
-                }
                 $prompt .= "\n";
             }
         } else {
