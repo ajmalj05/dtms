@@ -264,7 +264,7 @@ class AiChatController extends Controller
             $analysisPrompt .= "4. Base clinical analysis ONLY on LONG-TERM trends provided in the full context.\n";
             $analysisPrompt .= "5. CONCLUSION must be authoritative and actionable based on exact data.\n";
             $analysisPrompt .= "6. ABSOLUTE RULE: STRICT COMPLIANCE REQUIRED. Use ONLY the explicitly provided data. You are STRICTLY FORBIDDEN from hallucinating, guessing, inferring, or assuming any medical conditions, treatments, past history, or missing data points.\n";
-            $analysisPrompt .= "7. COMPARATIVE FLAGGING: Track values over time. If a value was historically high and decreased in the latest test but is STILL abnormal, flag it comparatively (e.g., 'HbA1c decreased to 9.0 from historical average of 10.5, but remains high'). Always compare current abnormal values to past historical averages or recent previous values to provide context on the trend.\n";
+            $analysisPrompt .= "7. LONGITUDINAL TREND CORRELATION: You receive up to 5 previous historical records. You MUST explicitly correlate and track the trend across these records. If values are gradually increasing, mention the gradual increase. If values are gradually decreasing, mention the gradual decrease. If values were stable over a long period but suddenly increased/spiked recently, you MUST flag that exact sudden change.\n";
 
             $responseSchema = [
                 'type' => 'OBJECT',
@@ -280,7 +280,7 @@ class AiChatController extends Controller
                     'flags' => [
                         'type' => 'ARRAY',
                         'items' => ['type' => 'STRING'],
-                        'description' => "ACTIONABLE ALERTS & VARIATIONS (The Action). Highlight ONLY things that are WRONG or CHANGING. MUST Flag: 1) Dangerous Trends (e.g., Creatinine rose from X to Y), 2) Out-of-range Labs (Creatinine > 1.2, HbA1c > 7), 3) Missing Screenings, 4) Comparative flags for persistent abnormal values (e.g. 'HbA1c decreased to 9.0 from 10.0 but remains high', or 'HbA1c is persistently high, currently 9.0, up from 8.5')."
+                        'description' => "ACTIONABLE ALERTS & VARIATIONS (The Action). Highlight ONLY things that are WRONG or CHANGING. MUST Flag based on the last 5 records: 1) Gradual worsening trends (e.g., 'Creatinine gradually increased from 0.9 to 1.4'), 2) Gradual improving trends (e.g., 'HbA1c gradually decreased from 9.2 to 7.1'), 3) Sudden Spikes (e.g., 'BP was stable around 120/80 but suddenly spiked to 160/100 in the latest visit'), 4) Out-of-range Labs."
                     ],
                     'conclusion' => [
                         'type' => 'STRING',
