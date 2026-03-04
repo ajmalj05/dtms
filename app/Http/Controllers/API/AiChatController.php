@@ -967,6 +967,88 @@ class AiChatController extends Controller
     }
 
     /**
+     * AI Safety Check for New Medications
+     */
+    public function medicationCheck(Request $request)
+    {
+        $request->validate([
+            'medications' => 'required|array',
+            'psychiatric_medications' => 'nullable|string'
+        ]);
+
+        $medications = $request->medications; // Array of {name, dose}
+        $psych_meds = $request->psychiatric_medications ?? 'None';
+
+        // 1. Build the Prompt
+        $prompt = "You are an expert clinical pharmacist. Review the following proposed medication list for a patient to ensure safety before they are saved to the patient's record.\n\n";
+        
+        $prompt .= "=== PROPOSED MEDICATIONS ===\n";
+        foreach ($medications as $med) {
+             $prompt .= "- {$med['name']} (Dose: {$med['dose']})\n";
+        }
+        $prompt .= "\n=== PSYCHIATRIC MEDICATIONS ===\n{$psych_meds}\n\n";
+
+        $prompt .= "=== SAFETY CHECK RULES ===\n";
+        $prompt .= "1. **Severe Drug-Drug Interactions:** Check for any severe or contraindicated interactions between the listed medications (including psychiatric ones).\n";
+        $prompt .= "2. **Cumulative Dosage Limits:** Check if the combined dose of any specific active ingredient exceeds safe daily limits (e.g., Magnesium supplements combined should not exceed safe clinical limits).\n";
+        $prompt .= "3. **Immediate Risk Only:** Only flag issues that are immediately dangerous or clinically contraindicated. Ignore minor or common side effects.\n";
+        
+        $prompt .= "\nIf the combination is SAFE, output safe: true and a brief confirmation.\n";
+        $prompt .= "If the combination is UNSAFE, output safe: false and a concise reason explaining the exact danger.\n";
+
+        $responseSchema = [
+            'type' => 'OBJECT',
+            'properties' => [
+                'safe' => [
+                    'type' => 'BOOLEAN',
+                    'description' => "True if the medication combination and doses are safe. False if there is a severe interaction or overdose limit exceeded."
+                ],
+                'reason' => [
+                    'type' => 'STRING',
+                    'description' => "If safe is false, provide a concise explanation of the danger. If safe is true, say 'No severe interactions detected.'"
+                ]
+            ],
+            'required' => ['safe', 'reason']
+        ];
+
+        // 2. Call AI with JSON enforcement
+        $result = $this->callAI(
+            "You are a clinical pharmacist AI. Output strictly valid JSON.", 
+            $prompt,
+            [
+                'responseMimeType' => 'application/json',
+                'responseSchema' => $responseSchema
+            ]
+        );
+
+        if ($result['status'] === 'success') {
+            $jsonObj = json_decode($result['response'], true);
+            
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                // Fallback to safe if JSON is broken to prevent blocking workflow
+                return response()->json([
+                    'status' => 'success',
+                    'data' => ['safe' => true, 'reason' => 'AI validation failed, proceeding with save.']
+                ]);
+            }
+            
+            return response()->json([
+                'status' => 'success',
+                'data' => [
+                    'safe' => $jsonObj['safe'],
+                    'reason' => $jsonObj['reason']
+                ]
+            ]);
+        } else {
+             // Fallback to safe if API fails to prevent blocking workflow
+             return response()->json([
+                'status' => 'success',
+                'data' => ['safe' => true, 'reason' => 'AI validation unavailable, proceeding with save.']
+            ]);
+        }
+    }
+
+    /**
      * Gemini Context Caching Logic
      * Creates or retrieves a CachedContent resource for large patient histories.
      */

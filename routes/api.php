@@ -109,6 +109,8 @@ Route::middleware('auth.api:api')->group(function () {
 
     Route::post('app/getmedicinePurchaseDetails',[App\Http\Controllers\API\MobileApp\MedicineController::class, 'getmedicinePurchaseDetails']);
 
+    // AI Safety Check Route
+    Route::post('app/ai/medication-check', [App\Http\Controllers\API\AiChatController::class, 'medicationCheck']);
 
 });
 

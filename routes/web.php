@@ -66,6 +66,7 @@ Route::middleware([
     Route::post('/api/ai/chat', [App\Http\Controllers\API\AiChatController::class, 'handleChat']);
     Route::post('/api/ai/analyze', [App\Http\Controllers\API\AiChatController::class, 'getSummary'])->name('ai.analyze');
     Route::post('/api/ai/analyze-trend', [App\Http\Controllers\API\AiChatController::class, 'analyzeTrend'])->name('ai.analyze-trend');
+    Route::post('/api/ai/medication-check', [App\Http\Controllers\API\AiChatController::class, 'medicationCheck'])->name('ai.medication-check');
 
 
     Route::post('/masterData/saveDepartment', [App\Http\Controllers\users\MasterDataController::class, 'saveDepartment'])->name('saveDepartment');

@@ -1951,6 +1951,71 @@ $(document).ready(function(){
         formData.append('visit_date', visitDate);
         url='{{route('saveDtmsData')}}';
 
+        // --- PRE-SAVE AI MEDICATION SAFETY CHECK ---
+        var medicationsForAI = [];
+        var medNamesElements = document.getElementsByName('medicine_name_text[]'); // Assuming we can get name, or we can use medicine_idlist
+        var medDosesElements = document.querySelectorAll('input[name*=dose]');
+        
+        // If we don't have text names easily accessible in the form data, we pull what we can.
+        // Let's try to grab the names from the table rows if possible to give AI better context
+        $('#append_prescription_data tr').each(function() {
+            var medName = $(this).find('td:eq(1)').text().trim(); // Medication column
+            var dose = $(this).find('td:eq(3) input').val() || $(this).find('td:eq(3)').text().trim(); // Dose column
+            if (medName) {
+                medicationsForAI.push({ name: medName, dose: dose });
+            }
+        });
+
+        var psychMeds = $('#psychiatric_medications').val() || '';
+        
+        // If there are medicines, run the check
+        if (medicationsForAI.length > 0 || psychMeds.length > 0) {
+            swal({
+                title: "Checking Medications",
+                text: "AI is analyzing for safety and interactions...",
+                icon: "info",
+                buttons: false,
+                closeOnClickOutside: false,
+                closeOnEsc: false
+            });
+
+            $.ajax({
+                type: "POST",
+                url: "{{ route('ai.medication-check') }}",
+                data: {
+                    _token: "{{ csrf_token() }}",
+                    medications: medicationsForAI,
+                    psychiatric_medications: psychMeds
+                },
+                success: function(aiResult) {
+                    if (aiResult.status === 'success' && aiResult.data) {
+                        if (!aiResult.data.safe) {
+                            // BLOCK SAVE
+                            swal("Unsafe Medication Combination", 
+                                 "AI Safety Alert: " + aiResult.data.reason + "\n\nPlease adjust the medications or doses.", 
+                                 "warning");
+                            return; // Stop execution
+                        } else {
+                            // SAFE: Proceed to save data
+                            executeSaveDataAJAX(formData, url, crude, aiResult.data.reason);
+                        }
+                    } else {
+                        // AI check failed but didn't block, proceed
+                        executeSaveDataAJAX(formData, url, crude, "");
+                    }
+                },
+                error: function() {
+                    // API failure, proceed with normal save to avoid blocking workflow
+                    executeSaveDataAJAX(formData, url, crude, "");
+                }
+            });
+        } else {
+            // No medications to check
+            executeSaveDataAJAX(formData, url, crude, "");
+        }
+    }
+
+    function executeSaveDataAJAX(formData, url, crude, aiMessage) {
         $.ajax({
             type: "POST",
             url: url,
@@ -1960,15 +2025,17 @@ $(document).ready(function(){
             success: function(result){
                 if (result.status == 1) {
                     $('#visit_data tr').removeClass("active");
-                    // $("#tablettype_options").select2("val", "");
                     $('#tablettype_options').val('').selectpicker('refresh');
 
-                    swal("Done", result.message, "success");
+                    let successMsg = result.message;
+                    if (aiMessage && aiMessage !== "AI validation failed, proceeding with save." && aiMessage !== "AI validation unavailable, proceeding with save.") {
+                         successMsg += "\n\nAI Check: " + aiMessage;
+                    }
+
+                    swal("Done", successMsg, "success");
                     medicine = [];
 
                     var visitId = $('#current_dtms_visit_id').val();
-
-                   // getVistData(visitId);
                 } else if (result.status == 2) {
                     $('#visit_data tr').removeClass("active");
                     swal("Done", result.message, "success");
@@ -1984,7 +2051,6 @@ $(document).ready(function(){
                         $("#" + key + "_error").text(val[0]);
                     });
                 }
-
             }
         });
     }
