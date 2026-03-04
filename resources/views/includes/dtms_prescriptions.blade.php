@@ -57,8 +57,8 @@
 
 {{-- AI Prescription Validation — Inline Button + Results --}}
 <style>
-    @keyframes rxBtnAnime { 0% { background-position:0% 50%; } 100% { background-position:300% 50%; } }
-    @keyframes rxSpin2 { to { transform: rotate(360deg); } }
+    @@keyframes rxBtnAnime { 0% { background-position:0% 50%; } 100% { background-position:300% 50%; } }
+    @@keyframes rxSpin2 { to { transform: rotate(360deg); } }
     .rx-ai-panel { border-radius: 10px; overflow: hidden; margin-top: 12px; transition: all 0.3s; }
 </style>
 
