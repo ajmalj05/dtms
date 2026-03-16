@@ -17,34 +17,35 @@
                     <p class="text-muted">Analyzing patient vitals, medications, and history.</p>
                 </div>
                 <div id="aiAnalysisContent" style="display:none;">
-                    <div class="mb-3 p-2" style="border-bottom: 2px solid #f8f9fa;">
-                        <h6 class="text-dark font-weight-bold"><i class="fa fa-info-circle text-primary"></i> Clinical Overview</h6>
-                        <p id="aiOverviewText" class="mb-0" style="color: #2c3e50; font-size: 16px;"></p>
+
+                    {{-- Patient Summary --}}
+                    <div class="mb-4">
+                        <h6 class="font-weight-bold text-dark mb-2" style="font-size: 15px; border-bottom: 2px solid #007bff; padding-bottom: 6px;">
+                            <i class="fa fa-user-circle text-primary mr-1"></i> Patient Summary
+                        </h6>
+                        <p id="aiPatientSummaryText" class="mb-0" style="color: #2c3e50; font-size: 15px; line-height: 1.7;"></p>
                     </div>
 
-                    <div class="alert alert-info" role="alert" style="background-color: #f0f7ff; border-left: 5px solid #007bff; border-radius: 8px;">
-                        <h6 class="alert-heading text-primary font-weight-bold"><i class="fa fa-history"></i> Patient Context & History</h6>
-                        <p id="aiSummaryText" class="mb-0 mt-2" style="line-height: 1.6; font-size: 15px; color: #333;"></p>
-                    </div>
-                    
-                    <div id="aiFlagsSection" class="mt-4">
-                        <h6 class="mb-3 text-dark"><i class="fa fa-flag text-danger"></i> Clinical Flags & Alerts</h6>
-                        <ul id="aiFlagsList" class="list-group">
-                        </ul>
+                    {{-- AI-Generated Clinical Insights --}}
+                    <div class="mb-4">
+                        <h6 class="font-weight-bold text-dark mb-3" style="font-size: 15px; border-bottom: 2px solid #007bff; padding-bottom: 6px;">
+                            <i class="fa fa-lightbulb-o text-warning mr-1"></i> AI-Generated Clinical Insights
+                        </h6>
+                        <div id="aiInsightsList"></div>
                     </div>
 
-                    <!-- AI Conclusion Section -->
-                    <div class="mt-4 p-3" style="border: 2px solid #28a745; background-color: #f6fff7; border-radius: 8px;">
+                    {{-- AI Clinical Conclusion --}}
+                    <div class="mt-3 p-3" style="border: 2px solid #28a745; background-color: #f6fff7; border-radius: 8px;">
                         <h6 class="font-weight-bold text-success mb-2">
                             <i class="fa fa-user-md"></i> AI Clinical Conclusion
                         </h6>
-                         <div id="aiConclusionText" class="mb-0" style="color: #155724; font-size: 15px; line-height: 1.6;">
+                        <div id="aiConclusionText" class="mb-0" style="color: #155724; font-size: 15px; line-height: 1.6;">
                             Analysis in progress...
                         </div>
                     </div>
-                    
-                    <div class="mt-4 pt-3 border-top text-right">
-                         <p class="text-muted small mb-0">
+
+                    <div class="mt-3 pt-2 border-top text-right">
+                        <p class="text-muted small mb-0">
                             <em>* This analysis is AI-generated. Verify with clinical judgment.</em>
                         </p>
                     </div>
@@ -69,18 +70,17 @@
         $('#aiAnalysisLoading').show();
         $('#aiAnalysisContent').hide();
         $('#cachedBadge').hide();
-        $('#aiOverviewText').text('');
-        $('#aiSummaryText').text('');
-        $('#aiFlagsList').empty();
+        $('#aiPatientSummaryText').text('');
+        $('#aiInsightsList').empty();
         $('#aiConclusionText').text('Analysis in progress...');
-        
+
         let patientId = $('#patient_id').val();
-        
+
         if (!patientId) {
-             $('#aiAnalysisLoading').hide();
-             $('#aiAnalysisContent').show();
-             $('#aiSummaryText').text("Error: Patient ID not found. Please reload.");
-             return;
+            $('#aiAnalysisLoading').hide();
+            $('#aiAnalysisContent').show();
+            $('#aiPatientSummaryText').text("Error: Patient ID not found. Please reload.");
+            return;
         }
 
         $.ajax({
@@ -94,66 +94,45 @@
             success: function(response) {
                 $('#aiAnalysisLoading').hide();
                 $('#aiAnalysisContent').show();
-                
+
                 if (response.status === 'success') {
                     if (response.cached) {
                         $('#cachedBadge').show();
                     }
-                    
-                    $('#aiOverviewText').text(response.data.overview || 'N/A');
-                    
-                    // improved bullet list formatting
-                    let rawSummary = response.data.summary || 'N/A';
-                    let summaryHtml = '';
-                    
-                    // Split by various newline formats and bullet markers
-                    let lines = rawSummary.split(/\n|\\n|•/);
-                    let listItems = [];
-                    
-                    lines.forEach(line => {
-                        let cleanLine = line.trim();
-                        // Remove potential existing bullet characters from the start (-, *, •)
-                        cleanLine = cleanLine.replace(/^[-*•]\s*/, '');
-                        
-                        if (cleanLine.length > 5) { // Only add if it's a meaningful point
-                            listItems.push(`<li class="mb-2" style="list-style-type: disc; margin-left: 20px;">${cleanLine}</li>`);
-                        }
-                    });
-                    
-                    if (listItems.length > 0) {
-                         summaryHtml = '<ul style="padding-left: 0; margin-bottom: 0;">' + listItems.join('') + '</ul>';
-                    } else {
-                         summaryHtml = `<p class="text-muted italic">${rawSummary}</p>`;
-                    }
-                    
-                    $('#aiSummaryText').html(summaryHtml);
-                    
-                    let flagsHtml = '';
-                    if (response.data.flags && response.data.flags.length > 0) {
-                        response.data.flags.forEach(function(flag) {
-                            flagsHtml += `<li class="list-group-item list-group-item-warning mb-1" style="border-left: 4px solid #ff9800;">
-                                <i class="fa fa-exclamation-circle text-warning mr-2"></i> ${flag}
-                            </li>`;
+
+                    // Patient Summary (prose paragraph)
+                    $('#aiPatientSummaryText').text(response.data.patient_summary || 'No summary available.');
+
+                    // AI-Generated Clinical Insights (numbered sections)
+                    let insightsHtml = '';
+                    let insights = response.data.insights || [];
+                    if (insights.length > 0) {
+                        insights.forEach(function(insight, index) {
+                            insightsHtml += `
+                                <div class="mb-3">
+                                    <h6 class="font-weight-bold mb-1" style="color: #1a3a6b; font-size: 14px;">
+                                        ${index + 1}. ${insight.title || ''}
+                                    </h6>
+                                    <p class="mb-0" style="color: #333; font-size: 14px; line-height: 1.65; padding-left: 16px;">${insight.detail || ''}</p>
+                                </div>`;
                         });
                     } else {
-                        flagsHtml = `<li class="list-group-item list-group-item-success" style="border-left: 4px solid #4caf50;">
-                            <i class="fa fa-check-circle text-success mr-2"></i> No critical flags identified.
-                        </li>`;
+                        insightsHtml = '<p class="text-muted">No clinical insights generated.</p>';
                     }
-                    $('#aiFlagsList').html(flagsHtml);
+                    $('#aiInsightsList').html(insightsHtml);
 
                     // Populate Conclusion
                     let conclusion = response.data.conclusion || 'No specific directive provided.';
                     $('#aiConclusionText').html(conclusion);
 
                 } else {
-                    $('#aiOverviewText').text('Analysis failed: ' + (response.message || 'Unknown error.'));
+                    $('#aiPatientSummaryText').text('Analysis failed: ' + (response.message || 'Unknown error.'));
                 }
             },
             error: function(xhr) {
-                 $('#aiAnalysisLoading').hide();
-                 $('#aiAnalysisContent').show();
-                 $('#aiSummaryText').text("Error connecting to AI service (" + xhr.status + "). Please try again.");
+                $('#aiAnalysisLoading').hide();
+                $('#aiAnalysisContent').show();
+                $('#aiPatientSummaryText').text("Error connecting to AI service (" + xhr.status + "). Please try again.");
             }
         });
     }

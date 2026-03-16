@@ -258,36 +258,37 @@ class AiChatController extends Controller
             $systemPrompt = $this->buildSystemPrompt($context);
             $analysisPrompt = "Analyze the COMPLETE patient data for a Specialized Diabetes Hospital.\n";
             $analysisPrompt .= "RULES: \n";
-            $analysisPrompt .= "1. NO REDUNDANCY: Do not repeat facts from the Summary in the Flags section unless it is to highlight a dangerous change.\n";
-            $analysisPrompt .= "2. BE AGGRESSIVE: If labs are abnormal (like Creatinine 3.8), this is a major flag, not just a summary point.\n";
-            $analysisPrompt .= "3. NO Generic flags: Avoid 'Regular follow-up'. Find actual clinical gaps.\n";
-            $analysisPrompt .= "4. Base clinical analysis ONLY on LONG-TERM trends provided in the full context.\n";
+            $analysisPrompt .= "1. ABSOLUTE RULE: Use ONLY the explicitly provided data. NEVER hallucinate, guess, infer, or assume any missing data points. If data is not present, skip that point entirely.\n";
+            $analysisPrompt .= "2. LONGITUDINAL TREND CORRELATION: Use up to 5 previous historical records. Explicitly correlate and track the trend (gradual increase, gradual decrease, sudden spike, stable).\n";
+            $analysisPrompt .= "3. PATIENT SUMMARY: Write a single flowing prose paragraph (not bullet points) describing the patient. Include age, gender, key diagnoses with duration if known, current vitals, and BMI context if available. Only include what is in the data.\n";
+            $analysisPrompt .= "4. INSIGHTS: Generate numbered clinical insight sections ONLY for clinical areas where you have actual data. Each insight must have a short title and a detailed paragraph. Do NOT generate an insight section if there is no data for it. Possible sections include (but generate ONLY if data exists): Glycemic Control Trend, Renal Risk, Liver Fibrosis, Cardiovascular Risk, Lipid Control, Medication Tolerance, Blood Pressure Trend, Weight/BMI Trend, Other relevant findings. End with an 'Overall AI Interpretation' insight summarizing the key points as a bullet list.\n";
             $analysisPrompt .= "5. CONCLUSION must be authoritative and actionable based on exact data.\n";
-            $analysisPrompt .= "6. ABSOLUTE RULE: STRICT COMPLIANCE REQUIRED. Use ONLY the explicitly provided data. You are STRICTLY FORBIDDEN from hallucinating, guessing, inferring, or assuming any medical conditions, treatments, past history, or missing data points.\n";
-            $analysisPrompt .= "7. LONGITUDINAL TREND CORRELATION: You receive up to 5 previous historical records. You MUST explicitly correlate and track the trend across these records. If values are gradually increasing, mention the gradual increase. If values are gradually decreasing, mention the gradual decrease. If values were stable over a long period but suddenly increased/spiked recently, you MUST flag that exact sudden change.\n";
 
             $responseSchema = [
                 'type' => 'OBJECT',
                 'properties' => [
-                    'overview' => [
+                    'patient_summary' => [
                         'type' => 'STRING',
-                        'description' => "EXECUTIVE SUMMARY (2 Sentences). Identity (Age/Gender/Key Conditions) + Current Clinical Trajectory (Stable/Worsening/Improving). Example: '71yr Female with long-standing T2DM and Class III Obesity. Current presentation suggests worsening renal function and suboptimal glycemic control requiring intervention.',"
+                        'description' => 'A single flowing prose paragraph (2-4 sentences) describing the patient. Include: age, gender, key diagnoses with duration if known, current vitals (BP, BMI if available), and current clinical trajectory. ONLY use data that is explicitly present. Do NOT use bullet points.'
                     ],
-                    'summary' => [
-                        'type' => 'STRING',
-                        'description' => "PATIENT CONTEXT (The Clinical Background). Create 3 distinct bullet points covering: 1) **Disease Burden:** Primary diagnoses and duration (if known). 2) **Comorbidities:** Key active associated conditions (HTN, Dyslipidemia, etc). 3) **Care Pattern:** Recent engagement (regular vs irregular visits) and current therapy class (Insulin/OADs). Use '• ' for bullets."
-                    ],
-                    'flags' => [
+                    'insights' => [
                         'type' => 'ARRAY',
-                        'items' => ['type' => 'STRING'],
-                        'description' => "ACTIONABLE ALERTS & VARIATIONS (The Action). Highlight ONLY things that are WRONG or CHANGING. MUST Flag based on the last 5 records: 1) Gradual worsening trends (e.g., 'Creatinine gradually increased from 0.9 to 1.4'), 2) Gradual improving trends (e.g., 'HbA1c gradually decreased from 9.2 to 7.1'), 3) Sudden Spikes (e.g., 'BP was stable around 120/80 but suddenly spiked to 160/100 in the latest visit'), 4) Out-of-range Labs."
+                        'items' => [
+                            'type' => 'OBJECT',
+                            'properties' => [
+                                'title' => ['type' => 'STRING', 'description' => 'Short title for this clinical insight section, e.g. Glycemic Control Trend, Renal Risk Alert, Cardiovascular Risk Marker, Overall AI Interpretation'],
+                                'detail' => ['type' => 'STRING', 'description' => 'A detailed paragraph explaining this clinical insight with specific values, trends, and clinical significance based ONLY on available data.']
+                            ],
+                            'required' => ['title', 'detail']
+                        ],
+                        'description' => 'An array of numbered clinical insight objects. Generate ONLY for areas where actual patient data exists. Always end with an Overall AI Interpretation insight that contains a brief bullet-list summary.'
                     ],
                     'conclusion' => [
                         'type' => 'STRING',
                         'description' => "CONSULTANT DIRECTIVE. Provide a structured verdict. Start with '<b>Assessment:</b>' [Explain the clinical status]. Then add '<br><b>Plan:</b>' [Specific next steps/referrals]."
                     ]
                 ],
-                'required' => ['overview', 'summary', 'flags', 'conclusion']
+                'required' => ['patient_summary', 'insights', 'conclusion']
             ];
 
             // EXPERIMENTAL: Implementation of "Cached Input" via Gemini Context Caching
@@ -312,17 +313,15 @@ class AiChatController extends Controller
                 ]);
                 
                 $finalData = [
-                    'overview' => 'N/A',
-                    'summary' => 'N/A',
-                    'flags' => [],
+                    'patient_summary' => 'N/A',
+                    'insights' => [],
                     'conclusion' => 'Analysis failed. Please try again.',
                     'is_error' => true
                 ];
             } else {
                 $finalData = [
-                    'overview' => trim($jsonObj['overview'] ?? 'N/A'),
-                    'summary' => trim($jsonObj['summary'] ?? 'N/A'),
-                    'flags' => $jsonObj['flags'] ?? [],
+                    'patient_summary' => trim($jsonObj['patient_summary'] ?? 'N/A'),
+                    'insights' => $jsonObj['insights'] ?? [],
                     'conclusion' => trim($jsonObj['conclusion'] ?? ''),
                     'is_error' => false
                 ];
