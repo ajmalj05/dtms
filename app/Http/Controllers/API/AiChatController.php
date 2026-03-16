@@ -283,12 +283,17 @@ class AiChatController extends Controller
                         ],
                         'description' => 'An array of numbered clinical insight objects. Generate ONLY for areas where actual patient data exists. Always end with an Overall AI Interpretation insight that contains a brief bullet-list summary.'
                     ],
+                    'flags' => [
+                        'type' => 'ARRAY',
+                        'items' => ['type' => 'STRING'],
+                        'description' => "ACTIONABLE ALERTS & VARIATIONS. Highlight ONLY things that are WRONG or CHANGING based on the last 5 records: 1) Gradual worsening trends (e.g., 'Creatinine gradually increased from 0.9 to 1.4'), 2) Gradual improving trends (e.g., 'HbA1c gradually decreased from 9.2 to 7.1'), 3) Sudden Spikes (e.g., 'BP was stable around 120/80 but suddenly spiked to 160/100 in the latest visit'), 4) Out-of-range Labs. Be aggressive — if a lab is critically abnormal, flag it."
+                    ],
                     'conclusion' => [
                         'type' => 'STRING',
                         'description' => "CONSULTANT DIRECTIVE. Provide a structured verdict. Start with '<b>Assessment:</b>' [Explain the clinical status]. Then add '<br><b>Plan:</b>' [Specific next steps/referrals]."
                     ]
                 ],
-                'required' => ['patient_summary', 'insights', 'conclusion']
+                'required' => ['patient_summary', 'insights', 'flags', 'conclusion']
             ];
 
             // EXPERIMENTAL: Implementation of "Cached Input" via Gemini Context Caching
@@ -315,6 +320,7 @@ class AiChatController extends Controller
                 $finalData = [
                     'patient_summary' => 'N/A',
                     'insights' => [],
+                    'flags' => [],
                     'conclusion' => 'Analysis failed. Please try again.',
                     'is_error' => true
                 ];
@@ -322,6 +328,7 @@ class AiChatController extends Controller
                 $finalData = [
                     'patient_summary' => trim($jsonObj['patient_summary'] ?? 'N/A'),
                     'insights' => $jsonObj['insights'] ?? [],
+                    'flags' => $jsonObj['flags'] ?? [],
                     'conclusion' => trim($jsonObj['conclusion'] ?? ''),
                     'is_error' => false
                 ];

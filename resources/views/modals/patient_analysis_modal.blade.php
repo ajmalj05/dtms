@@ -34,6 +34,12 @@
                         <div id="aiInsightsList"></div>
                     </div>
 
+                    {{-- Clinical Flags & Alerts --}}
+                    <div id="aiFlagsSection" class="mt-2 mb-4">
+                        <h6 class="mb-3 text-dark"><i class="fa fa-flag text-danger"></i> Clinical Flags &amp; Alerts</h6>
+                        <ul id="aiFlagsList" class="list-group"></ul>
+                    </div>
+
                     {{-- AI Clinical Conclusion --}}
                     <div class="mt-3 p-3" style="border: 2px solid #28a745; background-color: #f6fff7; border-radius: 8px;">
                         <h6 class="font-weight-bold text-success mb-2">
@@ -72,6 +78,7 @@
         $('#cachedBadge').hide();
         $('#aiPatientSummaryText').text('');
         $('#aiInsightsList').empty();
+        $('#aiFlagsList').empty();
         $('#aiConclusionText').text('Analysis in progress...');
 
         let patientId = $('#patient_id').val();
@@ -120,6 +127,21 @@
                         insightsHtml = '<p class="text-muted">No clinical insights generated.</p>';
                     }
                     $('#aiInsightsList').html(insightsHtml);
+
+                    // Clinical Flags & Alerts
+                    let flagsHtml = '';
+                    if (response.data.flags && response.data.flags.length > 0) {
+                        response.data.flags.forEach(function(flag) {
+                            flagsHtml += `<li class="list-group-item list-group-item-warning mb-1" style="border-left: 4px solid #ff9800;">
+                                <i class="fa fa-exclamation-circle text-warning mr-2"></i> ${flag}
+                            </li>`;
+                        });
+                    } else {
+                        flagsHtml = `<li class="list-group-item list-group-item-success" style="border-left: 4px solid #4caf50;">
+                            <i class="fa fa-check-circle text-success mr-2"></i> No critical flags identified.
+                        </li>`;
+                    }
+                    $('#aiFlagsList').html(flagsHtml);
 
                     // Populate Conclusion
                     let conclusion = response.data.conclusion || 'No specific directive provided.';
