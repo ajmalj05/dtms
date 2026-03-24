@@ -253,6 +253,7 @@ class AiChatController extends Controller
             if (!$context) {
                 return response()->json(['status' => 'error', 'message' => 'Patient not found'], 404);
             }
+            $deterministicFlags = $this->buildDeterministicFlags($context);
 
             // Build Summary Prompt
             $systemPrompt = $this->buildSystemPrompt($context);
@@ -295,7 +296,7 @@ class AiChatController extends Controller
             $analysisPrompt .= "  Then a final plain text sentence: 'The system recommends [specific monitoring/action] during future visits.'\n\n";
 
             $analysisPrompt .= "=== FLAGS ===\n";
-            $analysisPrompt .= "List only actionable clinical alerts with specific values and direction (e.g. 'Creatinine gradually increased from 0.9 to 1.2 mg/dL over 5 years'). Include both worsening and improving flags.\n\n";
+            $analysisPrompt .= "IMPORTANT: Official alert flags are computed by the backend deterministic engine. Do NOT generate additional free-form flags. Return an empty array for flags unless explicitly required by schema validation.\n\n";
 
             $analysisPrompt .= "=== CONCLUSION ===\n";
             $analysisPrompt .= "Start with '<b>Assessment:</b>' then overall clinical status summary. Then '<br><b>Plan:</b>' with specific next steps, monitoring frequency, and referrals if indicated.\n";
@@ -328,7 +329,7 @@ class AiChatController extends Controller
                     'flags' => [
                         'type' => 'ARRAY',
                         'items' => ['type' => 'STRING'],
-                        'description' => "Actionable clinical alerts with specific values and direction. Examples: 'Creatinine gradually increased from 0.9 to 1.2 mg/dL over 5 years', 'HbA1c improved from 8.2% to 6.5% over 5 visits'. Include worsening and improving flags. Flag medication intolerances."
+                        'description' => "Reserved for compatibility. Keep empty where possible because deterministic backend computes official flags."
                     ],
                     'conclusion' => [
                         'type' => 'STRING',
@@ -362,7 +363,8 @@ class AiChatController extends Controller
                 $finalData = [
                     'patient_summary' => 'N/A',
                     'insights' => [],
-                    'flags' => [],
+                    'flags' => $deterministicFlags['flags'],
+                    'flags_structured' => $deterministicFlags['flags_structured'],
                     'conclusion' => 'Analysis failed. Please try again.',
                     'is_error' => true
                 ];
@@ -370,7 +372,8 @@ class AiChatController extends Controller
                 $finalData = [
                     'patient_summary' => trim($jsonObj['patient_summary'] ?? 'N/A'),
                     'insights' => $jsonObj['insights'] ?? [],
-                    'flags' => $jsonObj['flags'] ?? [],
+                    'flags' => $deterministicFlags['flags'],
+                    'flags_structured' => $deterministicFlags['flags_structured'],
                     'conclusion' => trim($jsonObj['conclusion'] ?? ''),
                     'is_error' => false
                 ];
@@ -1307,5 +1310,210 @@ class AiChatController extends Controller
         }
         
         Cache::forget($trackerKey);
+    }
+
+    private function buildDeterministicFlags(array $context): array
+    {
+        $structured = [];
+        $maxHistoryPoints = (int) config('ai_flags.max_history_points', 5);
+        $rules = config('ai_flags.rules', []);
+
+        foreach ($this->extractLabTrends($context['testResults'] ?? collect(), $maxHistoryPoints) as $trend) {
+            $rule = $this->matchTrendRule($trend['metric_key'], $rules);
+            if (!$rule) {
+                continue;
+            }
+
+            $severity = $this->resolveSeverity($trend, $rule);
+            if (!$severity) {
+                continue;
+            }
+
+            $structured[] = $this->formatStructuredFlag($trend, $severity);
+        }
+
+        if (($context['alerts'] ?? null) && !empty($context['alerts']->psychiatric_medications)) {
+            $structured[] = [
+                'metric' => 'Psychiatric medication history',
+                'direction' => 'status',
+                'from_value' => null,
+                'to_value' => null,
+                'unit' => null,
+                'latest_date' => $context['alerts']->created_at ? \Carbon\Carbon::parse($context['alerts']->created_at)->format('d-m-Y') : null,
+                'period' => 'latest record',
+                'severity' => 'info',
+                'message' => 'Psychiatric medication history is recorded; consider medication interactions during treatment planning.'
+            ];
+        }
+
+        usort($structured, function ($a, $b) {
+            $rank = ['critical' => 4, 'high' => 3, 'moderate' => 2, 'info' => 1];
+            return ($rank[$b['severity']] ?? 0) <=> ($rank[$a['severity']] ?? 0);
+        });
+
+        return [
+            'flags' => array_values(array_map(fn($row) => $row['message'], $structured)),
+            'flags_structured' => array_values($structured),
+        ];
+    }
+
+    private function extractLabTrends($testResults, int $maxHistoryPoints = 5): array
+    {
+        if (!$testResults || $testResults->count() === 0) {
+            return [];
+        }
+
+        $trends = [];
+        $grouped = $testResults->groupBy('TestName');
+
+        foreach ($grouped as $testName => $rows) {
+            $ordered = $rows->sortBy(function ($row) {
+                return $row->created_at ? \Carbon\Carbon::parse($row->created_at)->timestamp : 0;
+            })->values();
+
+            $window = $ordered->slice(max(0, $ordered->count() - $maxHistoryPoints))->values();
+            if ($window->count() < 2) {
+                continue;
+            }
+
+            $start = $window->first();
+            $latest = $window->last();
+            $from = $this->toNumeric($start->ResultValue ?? null);
+            $to = $this->toNumeric($latest->ResultValue ?? null);
+            if ($from === null || $to === null) {
+                continue;
+            }
+
+            $delta = $to - $from;
+            $percentChange = $from == 0.0 ? null : (($delta / abs($from)) * 100.0);
+
+            $direction = 'stable';
+            if ($delta > 0) {
+                $direction = 'increase';
+            } elseif ($delta < 0) {
+                $direction = 'decrease';
+            }
+
+            $trends[] = [
+                'metric_name' => (string) $testName,
+                'metric_key' => $this->normalizeMetricKey((string) $testName),
+                'direction' => $direction,
+                'from_value' => $from,
+                'to_value' => $to,
+                'delta' => $delta,
+                'percent_change' => $percentChange,
+                'unit' => $latest->unit ?? ($start->unit ?? ''),
+                'latest_date' => $latest->created_at ? \Carbon\Carbon::parse($latest->created_at)->format('d-m-Y') : null,
+                'points' => $window->count(),
+            ];
+        }
+
+        return $trends;
+    }
+
+    private function normalizeMetricKey(string $name): string
+    {
+        $n = strtolower(trim($name));
+        if (strpos($n, 'creatinine') !== false && strpos($n, 'albumin') === false) return 'creatinine';
+        if (strpos($n, 'glycosylated hemoglobin') !== false || strpos($n, 'hba1c') !== false) return 'hba1c';
+        if (strpos($n, 'albumin') !== false && strpos($n, 'creatinine') !== false) return 'uacr';
+        if (strpos($n, 'egfr') !== false) return 'egfr';
+        if (strpos($n, 'c - reactive protein') !== false || strpos($n, 'crp') !== false) return 'crp';
+        if (strpos($n, 'fbs') !== false || strpos($n, 'fasting') !== false) return 'fbs';
+        if (strpos($n, 'ppbs') !== false || strpos($n, 'post') !== false) return 'ppbs';
+        if (strpos($n, 'pre lunch') !== false) return 'pre_lunch';
+        if (strpos($n, 'pre dinner') !== false) return 'pre_dinner';
+        if (strpos($n, 'plbs') !== false) return 'plbs';
+        if (strpos($n, 'pdbs') !== false) return 'pdbs';
+        return 'other';
+    }
+
+    private function matchTrendRule(string $metricKey, array $rules): ?array
+    {
+        return $rules[$metricKey] ?? null;
+    }
+
+    private function resolveSeverity(array $trend, array $rule): ?string
+    {
+        $deltaAbs = abs((float) ($trend['delta'] ?? 0));
+        $pctAbs = abs((float) ($trend['percent_change'] ?? 0));
+        $toValue = (float) ($trend['to_value'] ?? 0);
+        $direction = $trend['direction'] ?? 'stable';
+
+        if (($rule['only_direction'] ?? null) && $direction !== $rule['only_direction']) {
+            return null;
+        }
+        if (($rule['skip_if_stable'] ?? true) && $direction === 'stable') {
+            return null;
+        }
+
+        foreach (($rule['severities'] ?? []) as $severity => $condition) {
+            $directionOk = !isset($condition['direction']) || $direction === $condition['direction'];
+            $deltaOk = !isset($condition['min_delta']) || $deltaAbs >= (float) $condition['min_delta'];
+            $pctOk = !isset($condition['min_percent']) || $pctAbs >= (float) $condition['min_percent'];
+            $toOk = !isset($condition['min_to']) || $toValue >= (float) $condition['min_to'];
+            $toMaxOk = !isset($condition['max_to']) || $toValue <= (float) $condition['max_to'];
+            if ($directionOk && $deltaOk && $pctOk && $toOk && $toMaxOk) {
+                return $severity;
+            }
+        }
+
+        return null;
+    }
+
+    private function formatStructuredFlag(array $trend, string $severity): array
+    {
+        $directionWord = $trend['direction'] === 'increase' ? 'increased' : ($trend['direction'] === 'decrease' ? 'decreased' : 'remained stable');
+        $fromText = $this->formatNumber($trend['from_value']);
+        $toText = $this->formatNumber($trend['to_value']);
+        $unit = trim((string) ($trend['unit'] ?? ''));
+        $unitText = $unit ? " {$unit}" : '';
+        $period = "{$trend['points']} test points";
+        $metricName = $trend['metric_name'];
+        $latestDate = $trend['latest_date'] ?: 'N/A';
+        $severityText = $this->severityText($severity);
+
+        $message = "{$metricName} {$directionWord} from {$fromText}{$unitText} to {$toText}{$unitText} (last test: {$latestDate}; period: {$period}), {$severityText}.";
+
+        return [
+            'metric' => $metricName,
+            'direction' => $trend['direction'],
+            'from_value' => $trend['from_value'],
+            'to_value' => $trend['to_value'],
+            'unit' => $unit ?: null,
+            'latest_date' => $trend['latest_date'],
+            'period' => $period,
+            'severity' => $severity,
+            'message' => $message,
+        ];
+    }
+
+    private function toNumeric($value): ?float
+    {
+        if ($value === null) return null;
+        $normalized = preg_replace('/[^0-9.\-]/', '', (string) $value);
+        if ($normalized === '' || !is_numeric($normalized)) return null;
+        return (float) $normalized;
+    }
+
+    private function formatNumber($value): string
+    {
+        if ($value === null) return 'N/A';
+        $float = (float) $value;
+        if (floor($float) == $float) {
+            return (string) (int) $float;
+        }
+        return rtrim(rtrim(number_format($float, 2, '.', ''), '0'), '.');
+    }
+
+    private function severityText(string $severity): string
+    {
+        $map = [
+            'critical' => 'critical change',
+            'high' => 'high-priority change',
+            'moderate' => 'moderate change',
+            'info' => 'informational trend',
+        ];
+        return $map[$severity] ?? 'notable change';
     }
 }

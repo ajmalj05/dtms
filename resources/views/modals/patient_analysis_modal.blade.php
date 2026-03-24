@@ -118,6 +118,34 @@
         margin-top: 2px;
         flex-shrink: 0;
     }
+    #aiFlagsList .flag-item .flag-body {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        width: 100%;
+    }
+    #aiFlagsList .flag-item .flag-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+    }
+    #aiFlagsList .flag-item .flag-severity {
+        font-size: 11px;
+        padding: 1px 6px;
+        border-radius: 10px;
+        text-transform: uppercase;
+        font-weight: 700;
+    }
+    #aiFlagsList .flag-item .sev-critical { background: #f8d7da; color: #721c24; }
+    #aiFlagsList .flag-item .sev-high { background: #ffe5b4; color: #7a4b00; }
+    #aiFlagsList .flag-item .sev-moderate { background: #fff3cd; color: #6c5700; }
+    #aiFlagsList .flag-item .sev-info { background: #d1ecf1; color: #0c5460; }
+    #aiFlagsList .flag-item .flag-date {
+        font-size: 11px;
+        color: #7b6a38;
+        white-space: nowrap;
+    }
 </style>
 
 <script>
@@ -188,11 +216,35 @@
 
                 // Clinical Flags & Alerts (shown only if flags exist)
                 let flags = response.data.flags || [];
+                let structuredFlags = response.data.flags_structured || [];
                 if (flags.length > 0) {
                     let flagsHtml = '';
-                    flags.forEach(function(flag) {
-                        flagsHtml += `<li class="flag-item"><i class="fa fa-exclamation-circle text-warning"></i>${escapeHtml(flag)}</li>`;
-                    });
+                    if (structuredFlags.length > 0) {
+                        structuredFlags.forEach(function(flag) {
+                            let severity = (flag.severity || 'info').toLowerCase();
+                            let severityClass = 'sev-info';
+                            if (severity === 'critical') severityClass = 'sev-critical';
+                            else if (severity === 'high') severityClass = 'sev-high';
+                            else if (severity === 'moderate') severityClass = 'sev-moderate';
+
+                            let dateText = flag.latest_date ? `Last test: ${escapeHtml(flag.latest_date)}` : '';
+                            flagsHtml += `
+                                <li class="flag-item">
+                                    <i class="fa fa-exclamation-circle text-warning"></i>
+                                    <div class="flag-body">
+                                        <div class="flag-header">
+                                            <span class="flag-severity ${severityClass}">${escapeHtml(severity)}</span>
+                                            ${dateText ? `<span class="flag-date">${dateText}</span>` : ''}
+                                        </div>
+                                        <div>${escapeHtml(flag.message || '')}</div>
+                                    </div>
+                                </li>`;
+                        });
+                    } else {
+                        flags.forEach(function(flag) {
+                            flagsHtml += `<li class="flag-item"><i class="fa fa-exclamation-circle text-warning"></i>${escapeHtml(flag)}</li>`;
+                        });
+                    }
                     $('#aiFlagsList').html(flagsHtml);
                     $('#aiFlagsSection').show();
                 }
