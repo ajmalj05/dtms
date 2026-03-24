@@ -256,41 +256,83 @@ class AiChatController extends Controller
 
             // Build Summary Prompt
             $systemPrompt = $this->buildSystemPrompt($context);
-            $analysisPrompt = "Analyze the COMPLETE patient data for a Specialized Diabetes Hospital.\n";
-            $analysisPrompt .= "RULES: \n";
-            $analysisPrompt .= "1. ABSOLUTE RULE: Use ONLY the explicitly provided data. NEVER hallucinate, guess, infer, or assume any missing data points. If data is not present, skip that point entirely.\n";
-            $analysisPrompt .= "2. LONGITUDINAL TREND CORRELATION: Use up to 5 previous historical records. Explicitly correlate and track the trend (gradual increase, gradual decrease, sudden spike, stable).\n";
-            $analysisPrompt .= "3. PATIENT SUMMARY: Write a single flowing prose paragraph (not bullet points) describing the patient. Include age, gender, key diagnoses with duration if known, current vitals, and BMI context if available. Only include what is in the data.\n";
-            $analysisPrompt .= "4. INSIGHTS: Generate numbered clinical insight sections ONLY for clinical areas where you have actual data. Each insight must have a short title and a detailed paragraph. Do NOT generate an insight section if there is no data for it. Possible sections include (but generate ONLY if data exists): Glycemic Control Trend, Renal Risk, Liver Fibrosis, Cardiovascular Risk, Lipid Control, Medication Tolerance, Blood Pressure Trend, Weight/BMI Trend, Other relevant findings. End with an 'Overall AI Interpretation' insight summarizing the key points as a bullet list.\n";
-            $analysisPrompt .= "5. CONCLUSION must be authoritative and actionable based on exact data.\n";
+
+            $analysisPrompt  = "You are generating a formal AI-generated clinical summary report for a Specialized Diabetes Hospital.\n\n";
+
+            $analysisPrompt .= "=== ABSOLUTE DATA RULE ===\n";
+            $analysisPrompt .= "Use ONLY explicitly provided data. NEVER hallucinate, infer, or assume missing values. If a data point is absent, omit that section entirely.\n\n";
+
+            $analysisPrompt .= "=== WRITING STYLE (MANDATORY) ===\n";
+            $analysisPrompt .= "Write in a formal, third-person clinical AI voice. Use precise language as if the AI system itself is reporting.\n";
+            $analysisPrompt .= "- Always reference trend data as: 'from X [unit] to Y [unit] over the past N visits/years'.\n";
+            $analysisPrompt .= "- For worsening findings: end with a separate sentence starting with 'These findings suggest...' or 'This pattern suggests...' followed by 'The system flags this pattern as requiring clinical attention and closer monitoring.'\n";
+            $analysisPrompt .= "- For improving findings: end with 'This improvement may reflect...' or 'Continued monitoring is recommended to maintain the current target.'\n";
+            $analysisPrompt .= "- For static/stable findings: state clearly 'Current [parameters] are within recommended targets, indicating adequate management with current therapy.'\n";
+            $analysisPrompt .= "- For medication/allergy notes: start with 'The system notes that the patient previously...'\n";
+            $analysisPrompt .= "- For single elevated markers (no trend): state the value and its clinical significance, then 'Optimization of [risk area] management may be considered.'\n\n";
+
+            $analysisPrompt .= "=== PATIENT SUMMARY ===\n";
+            $analysisPrompt .= "Write a single flowing prose paragraph (2–4 sentences). Pattern: 'The patient is a [age]-year-old [gender] with a [N]-year history of [diagnosis 1], [condition 2] for [N] years, and [condition 3] for [N] years. He/She also has a history of [condition 4] diagnosed [N] years ago. His/Her current blood pressure is [BP] mmHg, and his/her BMI is [value] kg/m², which falls in the [category] range according to Asian Indian phenotype cut-offs, indicating increased cardiometabolic risk.' Include ONLY data that exists in the record.\n\n";
+
+            $analysisPrompt .= "=== CLINICAL INSIGHTS ===\n";
+            $analysisPrompt .= "Generate numbered clinical insight sections ONLY for areas where actual patient data exists. Use these exact title patterns based on the finding:\n";
+            $analysisPrompt .= "  - Improving glycemic trend → 'Glycemic Control Trend'\n";
+            $analysisPrompt .= "  - Worsening kidney markers → 'Renal Risk Alert'\n";
+            $analysisPrompt .= "  - Improving FibroScan → 'Liver Fibrosis Improvement' | Worsening → 'Liver Fibrosis Progression'\n";
+            $analysisPrompt .= "  - Elevated Lp(a), hsCRP, or CV risk factor → 'Cardiovascular Risk Marker'\n";
+            $analysisPrompt .= "  - Lipid panel within/outside targets → 'Lipid Control Status'\n";
+            $analysisPrompt .= "  - Drug intolerance or discontinuation → 'Medication Tolerance Alert'\n";
+            $analysisPrompt .= "  - Blood pressure pattern → 'Blood Pressure Trend'\n";
+            $analysisPrompt .= "  - Weight/BMI pattern → 'Weight and BMI Trend'\n\n";
+
+            $analysisPrompt .= "For each insight, start the detail with a framing sentence: 'Analysis of [area] data shows...' or 'AI analysis of [area] parameters shows...'. For multi-parameter worsening insights (e.g. renal), list all worsening parameters in one paragraph with 'accompanied by...' and 'Additionally,...'. Then on a new paragraph, give the clinical interpretation.\n\n";
+
+            $analysisPrompt .= "=== OVERALL AI INTERPRETATION (LAST INSIGHT — REQUIRED) ===\n";
+            $analysisPrompt .= "Always include this as the final numbered insight. Title: 'Overall AI Interpretation'.\n";
+            $analysisPrompt .= "Detail MUST follow this exact format:\n";
+            $analysisPrompt .= "  Line 1: 'Based on analysis of longitudinal clinical data, the system summarizes the patient\\'s current status as:'\n";
+            $analysisPrompt .= "  Then an HTML unordered list: <ul><li>[short status 1]</li><li>[short status 2]</li>...</ul>\n";
+            $analysisPrompt .= "  Then a final plain text sentence: 'The system recommends [specific monitoring/action] during future visits.'\n\n";
+
+            $analysisPrompt .= "=== FLAGS ===\n";
+            $analysisPrompt .= "List only actionable clinical alerts with specific values and direction (e.g. 'Creatinine gradually increased from 0.9 to 1.2 mg/dL over 5 years'). Include both worsening and improving flags.\n\n";
+
+            $analysisPrompt .= "=== CONCLUSION ===\n";
+            $analysisPrompt .= "Start with '<b>Assessment:</b>' then overall clinical status summary. Then '<br><b>Plan:</b>' with specific next steps, monitoring frequency, and referrals if indicated.\n";
 
             $responseSchema = [
                 'type' => 'OBJECT',
                 'properties' => [
                     'patient_summary' => [
                         'type' => 'STRING',
-                        'description' => 'A single flowing prose paragraph (2-4 sentences) describing the patient. Include: age, gender, key diagnoses with duration if known, current vitals (BP, BMI if available), and current clinical trajectory. ONLY use data that is explicitly present. Do NOT use bullet points.'
+                        'description' => 'A single flowing prose paragraph (2-4 sentences). Must follow this pattern: "The patient is a [age]-year-old [gender] with a [N]-year history of [diagnosis], [condition] for [N] years... His/Her current blood pressure is [BP] mmHg, and his/her BMI is [value] kg/m², which falls in the [category] range according to Asian Indian phenotype cut-offs, indicating increased cardiometabolic risk." Use ONLY data explicitly present in the record. No bullet points.'
                     ],
                     'insights' => [
                         'type' => 'ARRAY',
                         'items' => [
                             'type' => 'OBJECT',
                             'properties' => [
-                                'title' => ['type' => 'STRING', 'description' => 'Short title for this clinical insight section, e.g. Glycemic Control Trend, Renal Risk Alert, Cardiovascular Risk Marker, Overall AI Interpretation'],
-                                'detail' => ['type' => 'STRING', 'description' => 'A detailed paragraph explaining this clinical insight with specific values, trends, and clinical significance based ONLY on available data.']
+                                'title' => [
+                                    'type' => 'STRING',
+                                    'description' => 'Contextual title reflecting the clinical finding. Examples: "Glycemic Control Trend", "Renal Risk Alert", "Liver Fibrosis Improvement", "Cardiovascular Risk Marker", "Lipid Control Status", "Medication Tolerance Alert", "Blood Pressure Trend", "Overall AI Interpretation".'
+                                ],
+                                'detail' => [
+                                    'type' => 'STRING',
+                                    'description' => 'For standard insights: Start with "Analysis of [area] data shows..." or "AI analysis of [area] parameters shows...". Include specific numeric from→to values, trend direction, and a closing clinical significance or recommendation sentence. For multi-parameter insights list all parameters in one paragraph. For "Overall AI Interpretation" ONLY: start with "Based on analysis of longitudinal clinical data, the system summarizes the patient\'s current status as:" then an HTML <ul> with short <li> status statements, then a plain-text recommendation sentence starting with "The system recommends...".'
+                                ]
                             ],
                             'required' => ['title', 'detail']
                         ],
-                        'description' => 'An array of numbered clinical insight objects. Generate ONLY for areas where actual patient data exists. Always end with an Overall AI Interpretation insight that contains a brief bullet-list summary.'
+                        'description' => 'Array of numbered clinical insight objects. Generate ONLY for areas with actual patient data. The last item MUST always be "Overall AI Interpretation" with the HTML bullet list format.'
                     ],
                     'flags' => [
                         'type' => 'ARRAY',
                         'items' => ['type' => 'STRING'],
-                        'description' => "ACTIONABLE ALERTS & VARIATIONS. Highlight ONLY things that are WRONG or CHANGING based on the last 5 records: 1) Gradual worsening trends (e.g., 'Creatinine gradually increased from 0.9 to 1.4'), 2) Gradual improving trends (e.g., 'HbA1c gradually decreased from 9.2 to 7.1'), 3) Sudden Spikes (e.g., 'BP was stable around 120/80 but suddenly spiked to 160/100 in the latest visit'), 4) Out-of-range Labs. Be aggressive — if a lab is critically abnormal, flag it."
+                        'description' => "Actionable clinical alerts with specific values and direction. Examples: 'Creatinine gradually increased from 0.9 to 1.2 mg/dL over 5 years', 'HbA1c improved from 8.2% to 6.5% over 5 visits'. Include worsening and improving flags. Flag medication intolerances."
                     ],
                     'conclusion' => [
                         'type' => 'STRING',
-                        'description' => "CONSULTANT DIRECTIVE. Provide a structured verdict. Start with '<b>Assessment:</b>' [Explain the clinical status]. Then add '<br><b>Plan:</b>' [Specific next steps/referrals]."
+                        'description' => "Start with '<b>Assessment:</b>' [overall clinical status in 1-2 sentences]. Then '<br><b>Plan:</b>' [specific next steps: monitoring intervals, referrals, medication adjustments]."
                     ]
                 ],
                 'required' => ['patient_summary', 'insights', 'flags', 'conclusion']
