@@ -1317,6 +1317,8 @@ class AiChatController extends Controller
         $structured = [];
         $maxHistoryPoints = (int) config('ai_flags.max_history_points', 5);
         $rules = config('ai_flags.rules', []);
+        $includeInfoFlags = (bool) config('ai_flags.include_info_flags', false);
+        $includePsychiatricNote = (bool) config('ai_flags.include_psychiatric_note', false);
 
         foreach ($this->extractLabTrends($context['testResults'] ?? collect(), $maxHistoryPoints) as $trend) {
             $rule = $this->matchTrendRule($trend['metric_key'], $rules);
@@ -1328,11 +1330,18 @@ class AiChatController extends Controller
             if (!$severity) {
                 continue;
             }
+            if ($severity === 'info' && !$includeInfoFlags) {
+                continue;
+            }
 
             $structured[] = $this->formatStructuredFlag($trend, $severity);
         }
 
-        if (($context['alerts'] ?? null) && !empty($context['alerts']->psychiatric_medications)) {
+        if (
+            $includePsychiatricNote &&
+            ($context['alerts'] ?? null) &&
+            !empty($context['alerts']->psychiatric_medications)
+        ) {
             $structured[] = [
                 'metric' => 'Psychiatric medication history',
                 'direction' => 'status',
@@ -1367,6 +1376,8 @@ class AiChatController extends Controller
         $grouped = $testResults->groupBy('TestName');
 
         foreach ($grouped as $testName => $rows) {
+            $metricName = trim((string) $testName);
+            $metricKey = $this->normalizeMetricKey($metricName);
             $ordered = $rows->sortBy(function ($row) {
                 return $row->created_at ? \Carbon\Carbon::parse($row->created_at)->timestamp : 0;
             })->values();
@@ -1395,14 +1406,18 @@ class AiChatController extends Controller
             }
 
             $trends[] = [
-                'metric_name' => (string) $testName,
-                'metric_key' => $this->normalizeMetricKey((string) $testName),
+                'metric_name' => $metricName,
+                'metric_key' => $metricKey,
                 'direction' => $direction,
                 'from_value' => $from,
                 'to_value' => $to,
                 'delta' => $delta,
                 'percent_change' => $percentChange,
-                'unit' => $latest->unit ?? ($start->unit ?? ''),
+                'unit' => $this->resolveUnit(
+                    $metricKey,
+                    $latest->unit ?? ($start->unit ?? '')
+                ),
+                'start_date' => $start->created_at ? \Carbon\Carbon::parse($start->created_at)->format('d-m-Y') : null,
                 'latest_date' => $latest->created_at ? \Carbon\Carbon::parse($latest->created_at)->format('d-m-Y') : null,
                 'points' => $window->count(),
             ];
@@ -1438,7 +1453,16 @@ class AiChatController extends Controller
         $deltaAbs = abs((float) ($trend['delta'] ?? 0));
         $pctAbs = abs((float) ($trend['percent_change'] ?? 0));
         $toValue = (float) ($trend['to_value'] ?? 0);
+        $fromValue = (float) ($trend['from_value'] ?? 0);
         $direction = $trend['direction'] ?? 'stable';
+        $startInNormal = $this->isInNormalRange($fromValue, $rule);
+        $endInNormal = $this->isInNormalRange($toValue, $rule);
+        $isNormalToNormal = $startInNormal && $endInNormal;
+        $normalVariationDelta = isset($rule['normal_variation_delta']) ? (float) $rule['normal_variation_delta'] : null;
+
+        if ($isNormalToNormal && $normalVariationDelta !== null && $deltaAbs <= $normalVariationDelta) {
+            return null;
+        }
 
         if (($rule['only_direction'] ?? null) && $direction !== $rule['only_direction']) {
             return null;
@@ -1453,7 +1477,11 @@ class AiChatController extends Controller
             $pctOk = !isset($condition['min_percent']) || $pctAbs >= (float) $condition['min_percent'];
             $toOk = !isset($condition['min_to']) || $toValue >= (float) $condition['min_to'];
             $toMaxOk = !isset($condition['max_to']) || $toValue <= (float) $condition['max_to'];
+            $normalOnlyOk = !isset($condition['requires_abnormal_to']) || !$condition['requires_abnormal_to'] || !$endInNormal;
             if ($directionOk && $deltaOk && $pctOk && $toOk && $toMaxOk) {
+                if (!$normalOnlyOk) {
+                    continue;
+                }
                 return $severity;
             }
         }
@@ -1468,7 +1496,9 @@ class AiChatController extends Controller
         $toText = $this->formatNumber($trend['to_value']);
         $unit = trim((string) ($trend['unit'] ?? ''));
         $unitText = $unit ? " {$unit}" : '';
-        $period = "{$trend['points']} test points";
+        $period = $trend['start_date'] && $trend['latest_date']
+            ? "from {$trend['start_date']} to {$trend['latest_date']} ({$trend['points']} test points)"
+            : "{$trend['points']} test points";
         $metricName = $trend['metric_name'];
         $latestDate = $trend['latest_date'] ?: 'N/A';
         $severityText = $this->severityText($severity);
@@ -1515,5 +1545,46 @@ class AiChatController extends Controller
             'info' => 'informational trend',
         ];
         return $map[$severity] ?? 'notable change';
+    }
+
+    private function isInNormalRange(float $value, array $rule): bool
+    {
+        $min = isset($rule['normal_min']) ? (float) $rule['normal_min'] : null;
+        $max = isset($rule['normal_max']) ? (float) $rule['normal_max'] : null;
+
+        if ($min === null && $max === null) {
+            return false;
+        }
+        if ($min !== null && $value < $min) {
+            return false;
+        }
+        if ($max !== null && $value > $max) {
+            return false;
+        }
+        return true;
+    }
+
+    private function resolveUnit(string $metricKey, $rawUnit): ?string
+    {
+        $unit = trim((string) $rawUnit);
+        if ($unit !== '') {
+            return $unit;
+        }
+
+        $defaults = [
+            'creatinine' => 'mg/dL',
+            'hba1c' => '%',
+            'uacr' => 'mg/g',
+            'egfr' => 'mL/min/1.73 m2',
+            'crp' => 'mg/L',
+            'fbs' => 'mg/dL',
+            'ppbs' => 'mg/dL',
+            'plbs' => 'mg/dL',
+            'pre_lunch' => 'mg/dL',
+            'pre_dinner' => 'mg/dL',
+            'pdbs' => 'mg/dL',
+        ];
+
+        return $defaults[$metricKey] ?? null;
     }
 }
