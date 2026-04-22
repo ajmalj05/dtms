@@ -475,7 +475,7 @@
                     </svg>
                 </div>
                 <div class="ai-chat-header-text">
-                    <h4>AI Medical Assistant</h4>
+                    <h4>AI Medical Assistant </h4>
                     <p id="aiPatientName">{{ isset($patient_data) ? $patient_data->name . ' ' . ($patient_data->last_name ?? '') : 'Patient' }}</p>
 
                 </div>
