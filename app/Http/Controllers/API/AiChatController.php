@@ -41,6 +41,7 @@ class AiChatController extends Controller
      */
     public function chat(Request $request)
     {
+        ini_set('memory_limit', '512M');
         try {
             // 1. Verify user is authenticated
             if (!Auth::check()) {
