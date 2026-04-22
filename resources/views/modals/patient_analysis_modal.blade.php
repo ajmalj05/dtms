@@ -26,33 +26,65 @@
 
                     {{-- Patient Summary --}}
                     <div class="mb-4">
-                        <h6 class="font-weight-bold mb-2" style="font-size: 15px; color: #1a3a6b; border-bottom: 2px solid #007bff; padding-bottom: 6px;">
-                            <i class="fa fa-user-circle text-primary mr-1"></i> Patient Summary
-                        </h6>
+                        <div class="d-flex align-items-center justify-content-between flex-wrap mb-2 analysis-section-header" style="border-bottom: 2px solid #007bff; padding-bottom: 6px; gap: 8px;">
+                            <h6 class="font-weight-bold mb-0" style="font-size: 15px; color: #1a3a6b;">
+                                <i class="fa fa-user-circle text-primary mr-1"></i> Patient Summary
+                            </h6>
+                            <button type="button" class="btn btn-outline-primary btn-sm analysis-tts-btn" id="aiSummarySpeakBtn" onclick="speakAnalysisSection('aiPatientSummaryText', this)">
+                                <i class="fa fa-volume-up mr-1"></i> Voice
+                            </button>
+                        </div>
                         <p id="aiPatientSummaryText" class="mb-0" style="color: #2c3e50; font-size: 14.5px; line-height: 1.75;"></p>
                     </div>
 
                     {{-- AI-Generated Clinical Insights --}}
                     <div class="mb-4">
-                        <h6 class="font-weight-bold mb-3" style="font-size: 15px; color: #1a3a6b; border-bottom: 2px solid #007bff; padding-bottom: 6px;">
-                            <i class="fa fa-lightbulb-o text-warning mr-1"></i> AI-Generated Clinical Insights
-                        </h6>
+                        <div class="d-flex align-items-center justify-content-between flex-wrap mb-3 analysis-section-header" style="border-bottom: 2px solid #007bff; padding-bottom: 6px; gap: 8px;">
+                            <h6 class="font-weight-bold mb-0" style="font-size: 15px; color: #1a3a6b;">
+                                <i class="fa fa-lightbulb-o text-warning mr-1"></i> AI-Generated Clinical Insights
+                            </h6>
+                            <div class="d-flex align-items-center flex-wrap" style="gap: 8px;">
+                                <label for="aiAnalysisVoiceSpeed" class="mb-0 small text-muted">Speed</label>
+                                <select id="aiAnalysisVoiceSpeed" class="form-control form-control-sm" style="width: 90px;">
+                                    <option value="0.8">0.8x</option>
+                                    <option value="1" selected>1.0x</option>
+                                    <option value="1.2">1.2x</option>
+                                    <option value="1.4">1.4x</option>
+                                </select>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="aiAnalysisPauseBtn" onclick="toggleAnalysisSpeechPause()" disabled>
+                                    <i class="fa fa-pause mr-1"></i> Pause
+                                </button>
+                                <button type="button" class="btn btn-outline-danger btn-sm" id="aiAnalysisStopBtn" onclick="stopAnalysisSpeech()" disabled>
+                                    <i class="fa fa-stop mr-1"></i> Stop
+                                </button>
+                            </div>
+                        </div>
                         <div id="aiInsightsList"></div>
                     </div>
 
                     {{-- Clinical Flags & Alerts (supplementary) --}}
                     <div id="aiFlagsSection" class="mb-4" style="display:none;">
-                        <h6 class="font-weight-bold mb-2" style="font-size: 14px; color: #856404;">
-                            <i class="fa fa-exclamation-triangle text-warning mr-1"></i> Clinical Flags &amp; Alerts
-                        </h6>
+                        <div class="d-flex align-items-center justify-content-between flex-wrap mb-2" style="gap: 8px;">
+                            <h6 class="font-weight-bold mb-0" style="font-size: 14px; color: #856404;">
+                                <i class="fa fa-exclamation-triangle text-warning mr-1"></i> Clinical Flags &amp; Alerts
+                            </h6>
+                            <button type="button" class="btn btn-outline-warning btn-sm analysis-tts-btn" id="aiFlagsSpeakBtn" onclick="speakAnalysisSection('aiFlagsList', this)">
+                                <i class="fa fa-volume-up mr-1"></i> Voice
+                            </button>
+                        </div>
                         <ul id="aiFlagsList" class="list-unstyled mb-0"></ul>
                     </div>
 
                     {{-- AI Clinical Conclusion --}}
                     <div id="aiConclusionSection" class="mt-3 p-3" style="border: 1px solid #28a745; background-color: #f6fff7; border-radius: 6px; display:none;">
-                        <h6 class="font-weight-bold text-success mb-2" style="font-size: 14px;">
-                            <i class="fa fa-user-md mr-1"></i> AI Clinical Conclusion
-                        </h6>
+                        <div class="d-flex align-items-center justify-content-between flex-wrap mb-2" style="gap: 8px;">
+                            <h6 class="font-weight-bold text-success mb-0" style="font-size: 14px;">
+                                <i class="fa fa-user-md mr-1"></i> AI Clinical Conclusion
+                            </h6>
+                            <button type="button" class="btn btn-outline-success btn-sm analysis-tts-btn" id="aiConclusionSpeakBtn" onclick="speakAnalysisSection('aiConclusionText', this)">
+                                <i class="fa fa-volume-up mr-1"></i> Voice
+                            </button>
+                        </div>
                         <div id="aiConclusionText" style="color: #155724; font-size: 14px; line-height: 1.6;"></div>
                     </div>
 
@@ -103,6 +135,25 @@
     }
     #aiInsightsList .insight-detail li {
         margin-bottom: 3px;
+    }
+    #aiInsightsList .insight-header-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 8px;
+    }
+    #aiInsightsList .insight-header-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+    }
+    #aiInsightsList .insight-controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
     }
     #aiInsightsList .insight-severity {
         font-size: 11px;
@@ -190,9 +241,20 @@
         color: #7b6a38;
         white-space: nowrap;
     }
+    .analysis-tts-btn.is-speaking {
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.15);
+    }
+    #aiInsightsList .analysis-tts-btn {
+        padding: 2px 8px;
+        line-height: 1.4;
+    }
 </style>
 
 <script>
+    let analysisSpeechUtterance = null;
+    let analysisSpeechButton = null;
+    let analysisSpeechPaused = false;
+
     function openPatientAnalysis() {
         $('#patientAnalysisModal').modal('show');
         generateAnalysis();
@@ -208,6 +270,7 @@
         $('#aiFlagsSection').hide();
         $('#aiConclusionText').html('');
         $('#aiConclusionSection').hide();
+        stopAnalysisSpeech();
 
         let patientId = $('#patient_id').val();
 
@@ -249,13 +312,21 @@
                     insights.forEach(function(insight, index) {
                         let severity = normalizeInsightSeverity(insight.severity) || mapColorToSeverity(insight.color) || getInsightSeverity(insight);
                         let severityLabel = severity === 'high' ? 'High' : (severity === 'medium' ? 'Medium' : 'Low');
+                        let insightId = `aiInsightDetail-${index}`;
                         insightsHtml += `
                             <div class="insight-item severity-${severity}" data-ai-color="${escapeHtml((insight.color || '').toString())}">
-                                <div class="insight-title">
-                                    <span>${index + 1}. ${escapeHtml(insight.title || '')}</span>
-                                    <span class="insight-severity">${severityLabel}</span>
+                                <div class="insight-header-row">
+                                    <div class="insight-header-left">
+                                        <div class="insight-title mb-0">${index + 1}. ${escapeHtml(insight.title || '')}</div>
+                                        <span class="insight-severity">${severityLabel}</span>
+                                    </div>
+                                    <div class="insight-controls">
+                                        <button type="button" class="btn btn-outline-primary btn-sm analysis-tts-btn" onclick="speakAnalysisSection('${insightId}', this)">
+                                            <i class="fa fa-volume-up mr-1"></i> Voice
+                                        </button>
+                                    </div>
                                 </div>
-                                <div class="insight-detail">${insight.detail || ''}</div>
+                                <div class="insight-detail" id="${insightId}">${insight.detail || ''}</div>
                             </div>`;
                     });
                 } else {
@@ -383,4 +454,158 @@
 
         return 'medium';
     }
+
+    function speakAnalysisSection(elementId, button) {
+        if (!('speechSynthesis' in window)) {
+            alert("Your browser doesn't support Text to Speech.");
+            return;
+        }
+
+        const element = document.getElementById(elementId);
+        if (!element) {
+            return;
+        }
+
+        const text = extractSpeechText(element);
+        if (!text) {
+            return;
+        }
+
+        if (analysisSpeechButton === button && speechSynthesis.speaking && !speechSynthesis.paused) {
+            stopAnalysisSpeech();
+            return;
+        }
+
+        stopAnalysisSpeech(false);
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        const voices = window.speechSynthesis.getVoices();
+        const selectedVoice =
+            voices.find(function(voice) {
+                return voice.name.includes('Google') && voice.lang === 'en-IN';
+            }) ||
+            voices.find(function(voice) {
+                return voice.lang === 'en-IN';
+            }) ||
+            voices[0];
+
+        if (selectedVoice) {
+            utterance.voice = selectedVoice;
+        }
+
+        utterance.rate = parseFloat($('#aiAnalysisVoiceSpeed').val() || '1');
+        utterance.pitch = 1;
+
+        utterance.onstart = function() {
+            analysisSpeechUtterance = utterance;
+            analysisSpeechButton = button;
+            analysisSpeechPaused = false;
+            markActiveSpeechButton(button, true);
+            updateAnalysisSpeechControls();
+        };
+
+        utterance.onend = function() {
+            clearAnalysisSpeechState();
+        };
+
+        utterance.onerror = function() {
+            clearAnalysisSpeechState();
+        };
+
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
+    }
+
+    function extractSpeechText(element) {
+        const cloned = element.cloneNode(true);
+        $(cloned).find('button').remove();
+        return (cloned.innerText || cloned.textContent || '').replace(/\s+/g, ' ').trim();
+    }
+
+    function toggleAnalysisSpeechPause() {
+        if (!('speechSynthesis' in window) || !window.speechSynthesis.speaking) {
+            return;
+        }
+
+        if (window.speechSynthesis.paused) {
+            window.speechSynthesis.resume();
+            analysisSpeechPaused = false;
+        } else {
+            window.speechSynthesis.pause();
+            analysisSpeechPaused = true;
+        }
+
+        updateAnalysisSpeechControls();
+    }
+
+    function stopAnalysisSpeech(resetButton = true) {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+        }
+
+        if (resetButton) {
+            clearAnalysisSpeechState();
+        } else {
+            if (analysisSpeechButton) {
+                markActiveSpeechButton(analysisSpeechButton, false);
+            }
+            analysisSpeechUtterance = null;
+            analysisSpeechButton = null;
+            analysisSpeechPaused = false;
+            updateAnalysisSpeechControls();
+        }
+    }
+
+    function clearAnalysisSpeechState() {
+        if (analysisSpeechButton) {
+            markActiveSpeechButton(analysisSpeechButton, false);
+        }
+        analysisSpeechUtterance = null;
+        analysisSpeechButton = null;
+        analysisSpeechPaused = false;
+        updateAnalysisSpeechControls();
+    }
+
+    function markActiveSpeechButton(button, active) {
+        $('.analysis-tts-btn').removeClass('is-speaking');
+        $('.analysis-tts-btn i').removeClass('fa-stop').addClass('fa-volume-up');
+        $('.analysis-tts-btn').each(function() {
+            const labelNode = this.childNodes[this.childNodes.length - 1];
+            if (labelNode && labelNode.nodeType === Node.TEXT_NODE) {
+                labelNode.textContent = ' Voice';
+            }
+        });
+
+        if (active && button) {
+            $(button).addClass('is-speaking');
+            $(button).find('i').removeClass('fa-volume-up').addClass('fa-stop');
+            const labelNode = button.childNodes[button.childNodes.length - 1];
+            if (labelNode && labelNode.nodeType === Node.TEXT_NODE) {
+                labelNode.textContent = ' Stop';
+            }
+        }
+    }
+
+    function updateAnalysisSpeechControls() {
+        const canControl = 'speechSynthesis' in window && (window.speechSynthesis.speaking || analysisSpeechPaused);
+        $('#aiAnalysisPauseBtn').prop('disabled', !canControl);
+        $('#aiAnalysisStopBtn').prop('disabled', !canControl);
+        $('#aiAnalysisPauseBtn').html(window.speechSynthesis.paused
+            ? '<i class="fa fa-play mr-1"></i> Resume'
+            : '<i class="fa fa-pause mr-1"></i> Pause');
+    }
+
+    $('#aiAnalysisVoiceSpeed').on('change', function() {
+        if (analysisSpeechButton && analysisSpeechUtterance && window.speechSynthesis.speaking) {
+            const activeButton = analysisSpeechButton;
+            const activeElementId = $(activeButton).attr('onclick')?.match(/'([^']+)'/)?.[1];
+            if (activeElementId) {
+                speakAnalysisSection(activeElementId, activeButton);
+            }
+        }
+    });
+
+    $('#patientAnalysisModal').on('hidden.bs.modal', function() {
+        stopAnalysisSpeech();
+    });
 </script>
