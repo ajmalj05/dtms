@@ -25,37 +25,47 @@
     display: inline-flex;
     align-items: center;
     gap: 12px;
-    padding: 14px 18px;
+    padding: 14px 22px;
     border: 0;
-    border-radius: 18px;
-    background: linear-gradient(135deg, #635bdf 0%, #7a73ef 100%);
-    color: #ffffff;
+    border-radius: 999px;
+    background: #ffffff;
+    color: var(--ai-primary);
     cursor: pointer;
-    box-shadow: 0 20px 45px rgba(99, 91, 223, 0.28);
-    transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+    box-shadow:
+        0 10px 24px rgba(99, 91, 223, 0.18),
+        0 0 0 4px rgba(191, 232, 255, 0.55);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, background 0.2s ease;
 }
 
 .ai-chat-toggle:hover {
     transform: translateY(-2px);
-    box-shadow: 0 24px 55px rgba(99, 91, 223, 0.34);
+    box-shadow:
+        0 14px 28px rgba(99, 91, 223, 0.22),
+        0 0 0 5px rgba(191, 232, 255, 0.75);
 }
 
 .ai-chat-toggle svg {
     width: 22px;
     height: 22px;
     flex-shrink: 0;
+    color: #28c4ff;
+    background: rgba(40, 196, 255, 0.12);
+    padding: 8px;
+    border-radius: 14px;
+    box-sizing: content-box;
 }
 
 .ai-chat-toggle-label {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    line-height: 1.1;
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
 }
 
 .ai-chat-toggle-label strong {
     font-size: 15px;
     font-weight: 700;
+    color: #37c8ff;
+    letter-spacing: 0.01em;
 }
 
 .ai-chat-toggle-label span {
