@@ -525,6 +525,7 @@ class AiChatController extends Controller
                     ->leftJoin('tablet_type_master', 'tablet_type_master.id', '=', 'medicine_master.tablet_type_id')
                     ->where('patient_prescriptions.patient_id', $patientId)
                     ->orderBy('patient_prescriptions.created_at', 'desc')
+                    ->take(50) 
                     ->get();
             }
 
