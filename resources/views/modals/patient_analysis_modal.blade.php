@@ -466,60 +466,65 @@
             return;
         }
 
-        const text = extractSpeechText(element);
+        const text = getAnalysisSpeechText(element);
         if (!text) {
             return;
         }
 
-        if (analysisSpeechButton === button && speechSynthesis.speaking && !speechSynthesis.paused) {
-            stopAnalysisSpeech();
+        window.speechSynthesis.cancel();
+
+        if (button && $(button).hasClass('is-speaking')) {
+            clearAnalysisSpeechState();
             return;
         }
 
-        stopAnalysisSpeech(false);
+        $('.analysis-tts-btn').removeClass('is-speaking');
+        analysisSpeechPaused = false;
 
         const utterance = new SpeechSynthesisUtterance(text);
         const voices = window.speechSynthesis.getVoices();
-        const selectedVoice =
-            voices.find(function(voice) {
-                return voice.name.includes('Google') && voice.lang === 'en-IN';
-            }) ||
-            voices.find(function(voice) {
-                return voice.lang === 'en-IN';
-            }) ||
-            voices[0];
 
-        if (selectedVoice) {
-            utterance.voice = selectedVoice;
+        if (voices.length > 0) {
+            const selectedVoice =
+                voices.find(function(voice) {
+                    return voice.name.includes('Google') && voice.lang === 'en-IN';
+                }) ||
+                voices.find(function(voice) {
+                    return voice.lang === 'en-IN' && (voice.name.includes('Female') || voice.voiceURI.includes('Female'));
+                }) ||
+                voices.find(function(voice) {
+                    return voice.lang === 'en-IN';
+                }) ||
+                voices[0];
+
+            if (selectedVoice) {
+                utterance.voice = selectedVoice;
+            }
         }
 
+        utterance.pitch = 1.1;
         utterance.rate = parseFloat($('#aiAnalysisVoiceSpeed').val() || '1');
-        utterance.pitch = 1;
 
-        utterance.onstart = function() {
-            analysisSpeechUtterance = utterance;
+        if (button) {
             analysisSpeechButton = button;
-            analysisSpeechPaused = false;
+            analysisSpeechUtterance = utterance;
             markActiveSpeechButton(button, true);
-            updateAnalysisSpeechControls();
-        };
 
-        utterance.onend = function() {
-            clearAnalysisSpeechState();
-        };
+            utterance.onend = function() {
+                clearAnalysisSpeechState();
+            };
 
-        utterance.onerror = function() {
-            clearAnalysisSpeechState();
-        };
+            utterance.onerror = function() {
+                clearAnalysisSpeechState();
+            };
+        }
 
-        window.speechSynthesis.cancel();
+        updateAnalysisSpeechControls();
         window.speechSynthesis.speak(utterance);
     }
 
-    function extractSpeechText(element) {
-        const cloned = element.cloneNode(true);
-        $(cloned).find('button').remove();
-        return (cloned.innerText || cloned.textContent || '').replace(/\s+/g, ' ').trim();
+    function getAnalysisSpeechText(element) {
+        return (element.innerText || element.textContent || '').replace(/\s+/g, ' ').trim();
     }
 
     function toggleAnalysisSpeechPause() {
@@ -543,17 +548,7 @@
             window.speechSynthesis.cancel();
         }
 
-        if (resetButton) {
-            clearAnalysisSpeechState();
-        } else {
-            if (analysisSpeechButton) {
-                markActiveSpeechButton(analysisSpeechButton, false);
-            }
-            analysisSpeechUtterance = null;
-            analysisSpeechButton = null;
-            analysisSpeechPaused = false;
-            updateAnalysisSpeechControls();
-        }
+        clearAnalysisSpeechState();
     }
 
     function clearAnalysisSpeechState() {
@@ -590,7 +585,7 @@
         const canControl = 'speechSynthesis' in window && (window.speechSynthesis.speaking || analysisSpeechPaused);
         $('#aiAnalysisPauseBtn').prop('disabled', !canControl);
         $('#aiAnalysisStopBtn').prop('disabled', !canControl);
-        $('#aiAnalysisPauseBtn').html(window.speechSynthesis.paused
+        $('#aiAnalysisPauseBtn').html(('speechSynthesis' in window && window.speechSynthesis.paused)
             ? '<i class="fa fa-play mr-1"></i> Resume'
             : '<i class="fa fa-pause mr-1"></i> Pause');
     }
