@@ -595,10 +595,20 @@
             : '<i class="fa fa-pause mr-1"></i> Pause');
     }
 
+    function getSpeechTargetIdFromButton(button) {
+        if (!button) {
+            return null;
+        }
+
+        const onclickValue = $(button).attr('onclick') || '';
+        const match = onclickValue.match(/'([^']+)'/);
+        return match ? match[1] : null;
+    }
+
     $('#aiAnalysisVoiceSpeed').on('change', function() {
         if (analysisSpeechButton && analysisSpeechUtterance && window.speechSynthesis.speaking) {
             const activeButton = analysisSpeechButton;
-            const activeElementId = $(activeButton).attr('onclick')?.match(/'([^']+)'/)?.[1];
+            const activeElementId = getSpeechTargetIdFromButton(activeButton);
             if (activeElementId) {
                 speakAnalysisSection(activeElementId, activeButton);
             }
