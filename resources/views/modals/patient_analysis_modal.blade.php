@@ -75,25 +75,27 @@
 
 <style>
     #aiInsightsList .insight-item {
-        margin-bottom: 1.2rem;
-        padding-bottom: 1.1rem;
-        border-bottom: 1px solid #eef0f3;
-    }
-    #aiInsightsList .insight-item:last-child {
-        border-bottom: none;
-        margin-bottom: 0;
+        margin-bottom: 1rem;
+        padding: 14px 16px;
+        border-radius: 10px;
+        border-left: 5px solid #d6dce5;
+        background: #f8fafc;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
     }
     #aiInsightsList .insight-title {
         color: #1a3a6b;
         font-size: 14px;
         font-weight: 700;
-        margin-bottom: 6px;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
     }
     #aiInsightsList .insight-detail {
         color: #333;
         font-size: 14px;
         line-height: 1.7;
-        padding-left: 18px;
     }
     #aiInsightsList .insight-detail ul {
         margin: 6px 0 8px 0;
@@ -101,6 +103,48 @@
     }
     #aiInsightsList .insight-detail li {
         margin-bottom: 3px;
+    }
+    #aiInsightsList .insight-severity {
+        font-size: 11px;
+        padding: 3px 9px;
+        border-radius: 999px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        white-space: nowrap;
+    }
+    #aiInsightsList .insight-item.severity-high {
+        background: #fff5f5;
+        border-left-color: #dc3545;
+    }
+    #aiInsightsList .insight-item.severity-high .insight-title {
+        color: #9f1d2c;
+    }
+    #aiInsightsList .insight-item.severity-high .insight-severity {
+        background: #f8d7da;
+        color: #842029;
+    }
+    #aiInsightsList .insight-item.severity-medium {
+        background: #fffbea;
+        border-left-color: #f0ad4e;
+    }
+    #aiInsightsList .insight-item.severity-medium .insight-title {
+        color: #9a6700;
+    }
+    #aiInsightsList .insight-item.severity-medium .insight-severity {
+        background: #fff3cd;
+        color: #8a6d3b;
+    }
+    #aiInsightsList .insight-item.severity-low {
+        background: #f2fbf5;
+        border-left-color: #28a745;
+    }
+    #aiInsightsList .insight-item.severity-low .insight-title {
+        color: #176b2f;
+    }
+    #aiInsightsList .insight-item.severity-low .insight-severity {
+        background: #d4edda;
+        color: #1e7e34;
     }
     #aiFlagsList .flag-item {
         display: flex;
@@ -203,9 +247,14 @@
                 let insightsHtml = '';
                 if (insights.length > 0) {
                     insights.forEach(function(insight, index) {
+                        let severity = normalizeInsightSeverity(insight.severity) || mapColorToSeverity(insight.color) || getInsightSeverity(insight);
+                        let severityLabel = severity === 'high' ? 'High' : (severity === 'medium' ? 'Medium' : 'Low');
                         insightsHtml += `
-                            <div class="insight-item">
-                                <div class="insight-title">${index + 1}. ${escapeHtml(insight.title || '')}</div>
+                            <div class="insight-item severity-${severity}" data-ai-color="${escapeHtml((insight.color || '').toString())}">
+                                <div class="insight-title">
+                                    <span>${index + 1}. ${escapeHtml(insight.title || '')}</span>
+                                    <span class="insight-severity">${severityLabel}</span>
+                                </div>
                                 <div class="insight-detail">${insight.detail || ''}</div>
                             </div>`;
                     });
@@ -268,5 +317,70 @@
         var d = document.createElement('div');
         d.appendChild(document.createTextNode(str));
         return d.innerHTML;
+    }
+
+    function normalizeInsightSeverity(severity) {
+        severity = (severity || '').toString().trim().toLowerCase();
+        if (severity === 'high' || severity === 'medium' || severity === 'low') {
+            return severity;
+        }
+        return null;
+    }
+
+    function mapColorToSeverity(color) {
+        color = (color || '').toString().trim().toLowerCase();
+        if (color === 'red') return 'high';
+        if (color === 'yellow') return 'medium';
+        if (color === 'green') return 'low';
+        return null;
+    }
+
+    function getInsightSeverity(insight) {
+        const title = ((insight && insight.title) || '').toLowerCase();
+        const detail = ((insight && insight.detail) || '').toLowerCase().replace(/<[^>]*>/g, ' ');
+        const combined = `${title} ${detail}`;
+
+        const highSignals = [
+            'alert',
+            'worsened',
+            'worsening',
+            'requires clinical attention',
+            'closer monitoring',
+            'nephropathy',
+            'high risk',
+            'critical',
+            'progression',
+            'elevated inflammatory',
+            'suboptimal long-term glycemic control'
+        ];
+
+        const lowSignals = [
+            'within recommended targets',
+            'within target ranges',
+            'adequate management',
+            'improvement',
+            'improving',
+            'stable',
+            'controlled'
+        ];
+
+        if (highSignals.some(function(signal) { return combined.indexOf(signal) !== -1; })) {
+            return 'high';
+        }
+
+        if (lowSignals.some(function(signal) { return combined.indexOf(signal) !== -1; })) {
+            return 'low';
+        }
+
+        if (title.indexOf('overall ai interpretation') !== -1) {
+            if (combined.indexOf('worsening') !== -1 || combined.indexOf('nephropathy') !== -1) {
+                return 'high';
+            }
+            if (combined.indexOf('within target') !== -1) {
+                return 'medium';
+            }
+        }
+
+        return 'medium';
     }
 </script>

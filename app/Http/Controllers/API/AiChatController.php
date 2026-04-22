@@ -289,7 +289,12 @@ class AiChatController extends Controller
             $analysisPrompt .= "  - Blood pressure pattern → 'Blood Pressure Trend'\n";
             $analysisPrompt .= "  - Weight/BMI pattern → 'Weight and BMI Trend'\n\n";
 
-            $analysisPrompt .= "For each insight, start the detail with a framing sentence: 'Analysis of [area] data shows...' or 'AI analysis of [area] parameters shows...'. For multi-parameter worsening insights (e.g. renal), list all worsening parameters in one paragraph with 'accompanied by...' and 'Additionally,...'. Then on a new paragraph, give the clinical interpretation.\n\n";
+            $analysisPrompt .= "For each insight, start the detail with a framing sentence: 'Analysis of [area] data shows...' or 'AI analysis of [area] parameters shows...'. For multi-parameter worsening insights (e.g. renal), list all worsening parameters in one paragraph with 'accompanied by...' and 'Additionally,...'. Then on a new paragraph, give the clinical interpretation.\n";
+            $analysisPrompt .= "For each insight, also return severity and color using this exact mapping only:\n";
+            $analysisPrompt .= "  - severity high -> color red\n";
+            $analysisPrompt .= "  - severity medium -> color yellow\n";
+            $analysisPrompt .= "  - severity low -> color green\n";
+            $analysisPrompt .= "Use high for worsening trends, alerts, progression, major risk markers, or findings requiring close clinical attention. Use medium for fluctuating, mixed, borderline, or monitoring-needed findings. Use low for controlled, stable, improving, or within-target findings.\n\n";
 
             $analysisPrompt .= "=== OVERALL AI INTERPRETATION (LAST INSIGHT — REQUIRED) ===\n";
             $analysisPrompt .= "Always include this as the final numbered insight. Title: 'Overall AI Interpretation'.\n";
@@ -320,14 +325,24 @@ class AiChatController extends Controller
                                     'type' => 'STRING',
                                     'description' => 'Contextual title reflecting the clinical finding. Examples: "Glycemic Control Trend", "Renal Risk Alert", "Liver Fibrosis Improvement", "Cardiovascular Risk Marker", "Lipid Control Status", "Medication Tolerance Alert", "Blood Pressure Trend", "Overall AI Interpretation".'
                                 ],
+                                'severity' => [
+                                    'type' => 'STRING',
+                                    'description' => 'Clinical severity for this insight. Must be one of: high, medium, low.',
+                                    'enum' => ['high', 'medium', 'low']
+                                ],
+                                'color' => [
+                                    'type' => 'STRING',
+                                    'description' => 'UI color mapped from severity only. Must be one of: red, yellow, green.',
+                                    'enum' => ['red', 'yellow', 'green']
+                                ],
                                 'detail' => [
                                     'type' => 'STRING',
                                     'description' => 'For standard insights: Start with "Analysis of [area] data shows..." or "AI analysis of [area] parameters shows...". Include specific numeric from→to values, trend direction, and a closing clinical significance or recommendation sentence. For multi-parameter insights list all parameters in one paragraph. For "Overall AI Interpretation" ONLY: start with "Based on analysis of longitudinal clinical data, the system summarizes the patient\'s current status as:" then an HTML <ul> with short <li> status statements, then a plain-text recommendation sentence starting with "The system recommends...".'
                                 ]
                             ],
-                            'required' => ['title', 'detail']
+                            'required' => ['title', 'severity', 'color', 'detail']
                         ],
-                        'description' => 'Array of numbered clinical insight objects. Generate ONLY for areas with actual patient data. The last item MUST always be "Overall AI Interpretation" with the HTML bullet list format.'
+                        'description' => 'Array of numbered clinical insight objects. Generate ONLY for areas with actual patient data. Each item must include severity and mapped color. The last item MUST always be "Overall AI Interpretation" with the HTML bullet list format.'
                     ],
                     'flags' => [
                         'type' => 'ARRAY',
