@@ -222,6 +222,7 @@ class AiChatController extends Controller
      */
     public function getSummary(Request $request)
     {
+        ini_set('memory_limit', '512M');
         try {
             if (!Auth::check()) {
                 return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
