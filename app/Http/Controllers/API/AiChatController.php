@@ -138,6 +138,7 @@ class AiChatController extends Controller
         $provider = config('services.ai.provider', 'gemini');
         $model = 'gemini-2.5-flash'; // High-speed model for chat
         $apiKey = ($provider === 'gemini') ? config('services.gemini.api_key') : (config('services.ai.api_key') ?? config('services.gemini.api_key'));
+        $formattedUserMessage = $this->buildChatUserPrompt($userMessage);
 
         if (!$apiKey) {
             echo "data: " . json_encode(['error' => 'API key missing']) . "\n\n";
@@ -159,7 +160,7 @@ class AiChatController extends Controller
                 [
                     'role' => 'user',
                     'parts' => [
-                        ['text' => ($cachedContentName ? $userMessage : ($systemPrompt . "\n\nUser Question: " . $userMessage))]
+                        ['text' => ($cachedContentName ? $formattedUserMessage : ($systemPrompt . "\n\n" . $formattedUserMessage))]
                     ]
                 ]
             ],
@@ -651,9 +652,13 @@ class AiChatController extends Controller
         $prompt .= "CRITICAL INSTRUCTIONS:\n";
         $prompt .= "1. **ANSWER ONLY WHAT IS ASKED.** Do not dump clinical data unless the user specifically asks for a summary or status.\n";
         $prompt .= "2. **GREETINGS:** If the user says 'Hi' or 'Hello', simply reply courteously (e.g., 'Hello. Ready to review this patient.') without listing any medical data.\n";
-        $prompt .= "3. **FORMAT:** Use bullet points *only* when listing multiple items (Meds, Vitals, History). For simple questions, use a direct sentence.\n";
-        $prompt .= "4. **CONCISENESS:** Keep responses short (2-3 lines) unless a detailed list is requested.\n";
-        $prompt .= "5. **PRECISION:** Be precise. Do not summarize drug classes; list the specific medication names.";
+        $prompt .= "3. **DEFAULT FORMAT:** Prefer short bullet points for almost every answer. Use 2 to 5 bullets unless the question truly needs one short sentence.\n";
+        $prompt .= "4. **CONCISENESS:** Keep responses very short. Each bullet should usually be one line only.\n";
+        $prompt .= "5. **READABILITY:** For labs, meds, vitals, and history, put each item on its own bullet. Never return dense paragraphs or long blocks of plain text.\n";
+        $prompt .= "6. **LAB RESPONSES:** For lab result questions, show each test as one bullet in the format '- Test: value (date)'. If there are many results, show only the most relevant or latest items first.\n";
+        $prompt .= "7. **PRECISION:** Be precise. Do not summarize drug classes; list the specific medication names.\n";
+        $prompt .= "8. **SAFETY:** If asked for treatment decisions, give brief clinical support information and suggest doctor review when appropriate.\n";
+        $prompt .= "9. **NO HTML TABLES:** Use plain bullets only. No markdown tables.\n";
         
         // --- ANONYMIZED DEMOGRAPHICS ---
         $prompt .= "=== DATA (ANONYMIZED) ===\n";
@@ -861,6 +866,17 @@ class AiChatController extends Controller
         $prompt .= "8. END every response with exactly this format (1 blank line, italicized): \n\n*Verify with clinical judgment.*\n";
         
         return $prompt;
+    }
+
+    private function buildChatUserPrompt(string $userMessage): string
+    {
+        return "User Question: {$userMessage}\n\n" .
+            "Reply rules:\n" .
+            "- Keep it short.\n" .
+            "- Prefer point-wise bullets.\n" .
+            "- Use 2 to 5 bullets when possible.\n" .
+            "- For multiple lab values, put one result per bullet with value and date.\n" .
+            "- Avoid large paragraphs.\n";
     }
 
     private function callAI(string $systemPrompt, string $userMessage, array $configOverride = [], ?string $providerOverride = null, ?string $cachedContentName = null): array
